@@ -1,5 +1,5 @@
 {
-  "originHash" : "19c36db60054c6aba3a4d514925f0d044362237b8b61b2fd9f35742f62f2b98e",
+  "originHash" : "2cfeffd5a816f2680fd13ce168bc52c4854036a5a27fafbf6039d54509ce36e2",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -20,12 +20,48 @@
       }
     },
     {
+      "identity" : "clerk-vapor",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/kykim/clerk-vapor.git",
+      "state" : {
+        "revision" : "50dccbef16e6d2413f998dd423c9ac5e66085ce2",
+        "version" : "0.0.3"
+      }
+    },
+    {
       "identity" : "console-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/console-kit.git",
       "state" : {
         "revision" : "742f624a998cba2a9e653d9b1e91ad3f3a5dff6b",
         "version" : "4.15.2"
+      }
+    },
+    {
+      "identity" : "jwt-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/vapor/jwt-kit.git",
+      "state" : {
+        "revision" : "13e7513b3ba0afa13967daf77af2fb4ad087306c",
+        "version" : "4.13.5"
+      }
+    },
+    {
+      "identity" : "leaf",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/vapor/leaf.git",
+      "state" : {
+        "revision" : "b70a6108e4917f338f6b8848407bf655aa7e405f",
+        "version" : "4.5.1"
+      }
+    },
+    {
+      "identity" : "leaf-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/vapor/leaf-kit.git",
+      "state" : {
+        "revision" : "e84a3d17afa7f9dd2168af51a81fabf62196989e",
+        "version" : "1.14.1"
       }
     },
     {
@@ -114,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "6f70fa9eab24c1fd982af18c281c4525d05e3095",
-        "version" : "4.2.0"
+        "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
+        "version" : "3.15.1"
       }
     },
     {

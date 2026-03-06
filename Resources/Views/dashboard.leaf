@@ -1,0 +1,235 @@
+#extend("clerk-base"):
+    #export("body"):
+        <div class="dashboard">
+
+            <!-- Signed out state -->
+            <div class="clerk-signed-out">
+                <div class="hero">
+                    <h1>Welcome</h1>
+                    <p>Sign in to access your dashboard.</p>
+                    <div class="auth-buttons">
+                        <a class="btn btn-primary" href="/sign-in">Sign in</a>
+                        <a class="btn btn-secondary" href="/sign-up">Create account</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signed in state -->
+            <div class="clerk-signed-in">
+                <div class="dashboard-header">
+                    <h1>Dashboard</h1>
+                    <button class="btn btn-outline" id="sign-out-btn">Sign out</button>
+                </div>
+
+                <div class="profile-card">
+                    <div class="profile-avatar">
+                        <img id="user-avatar" src="" alt="Profile photo" style="display:none" />
+                        <div id="user-avatar-initials" class="avatar-initials"></div>
+                    </div>
+                    <div class="profile-info">
+                        <h2 id="user-full-name"></h2>
+                        <p id="user-email" class="user-email"></p>
+                        <p id="user-username" class="user-username"></p>
+                        <div class="profile-meta">
+                            <span class="meta-item">
+                                <span class="meta-label">User ID</span>
+                                <code id="user-id"></code>
+                            </span>
+                            <span class="meta-item" id="org-section" style="display:none">
+                                <span class="meta-label">Organisation</span>
+                                <span id="user-org"></span>
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-label">Member since</span>
+                                <span id="user-created"></span>
+                            </span>
+                        </div>
+                        <a class="btn btn-secondary" href="/profile" style="margin-top:1rem;display:inline-block">
+                            Edit profile
+                        </a>
+                    </div>
+                </div>
+
+                <div class="dashboard-content">
+                    <p>Add your app content here.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <style>
+            .dashboard { max-width: 860px; margin: 0 auto; }
+
+            /* Hero (signed out) */
+            .hero { text-align: center; padding: 4rem 1rem; }
+            .hero h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+            .hero p  { color: #6b7280; margin-bottom: 2rem; font-size: 1.1rem; }
+            .auth-buttons { display: flex; gap: 0.75rem; justify-content: center; }
+
+            /* Header row */
+            .dashboard-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 1.5rem;
+            }
+            .dashboard-header h1 { margin: 0; }
+
+            /* Profile card */
+            .profile-card {
+                display: flex;
+                gap: 1.5rem;
+                align-items: flex-start;
+                background: #fff;
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+
+            /* Avatar */
+            .profile-avatar { flex-shrink: 0; }
+            .profile-avatar img,
+            .avatar-initials {
+                width: 80px;
+                height: 80px;
+                border-radius: 50%;
+                object-fit: cover;
+            }
+            .avatar-initials {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #e5e7eb;
+                color: #374151;
+                font-size: 1.75rem;
+                font-weight: 600;
+            }
+
+            /* Info */
+            .profile-info { flex: 1; min-width: 0; }
+            .profile-info h2 { margin: 0 0 0.25rem; font-size: 1.25rem; }
+            .user-email    { margin: 0 0 0.15rem; color: #6b7280; font-size: 0.9rem; }
+            .user-username { margin: 0 0 1rem; color: #9ca3af; font-size: 0.85rem; }
+
+            /* Meta row */
+            .profile-meta {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+            .meta-item {
+                display: flex;
+                flex-direction: column;
+                gap: 0.15rem;
+            }
+            .meta-label {
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #9ca3af;
+                font-weight: 600;
+            }
+            .meta-item code {
+                font-size: 0.8rem;
+                background: #f3f4f6;
+                padding: 0.1rem 0.4rem;
+                border-radius: 4px;
+                color: #374151;
+            }
+
+            /* Dashboard content area */
+            .dashboard-content {
+                background: #f9fafb;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                padding: 1.5rem;
+                color: #6b7280;
+            }
+
+            /* Buttons */
+            .btn {
+                display: inline-block;
+                padding: 0.5rem 1.25rem;
+                border-radius: 6px;
+                font-size: 0.9rem;
+                font-weight: 500;
+                cursor: pointer;
+                text-decoration: none;
+                border: none;
+                transition: opacity 0.15s;
+            }
+            .btn:hover { opacity: 0.85; }
+            .btn-primary   { background: #111; color: #fff; }
+            .btn-secondary { background: #f3f4f6; color: #111; }
+            .btn-outline   { background: transparent; color: #374151; border: 1px solid #d1d5db; }
+
+            @media (max-width: 480px) {
+                .profile-card { flex-direction: column; }
+            }
+        </style>
+
+        <script>
+        (function waitForUser() {
+            var poll = setInterval(function () {
+                if (!window.Clerk || !window.Clerk.user) return;
+                clearInterval(poll);
+
+                var user = window.Clerk.user;
+
+                // Avatar
+                var img      = document.getElementById('user-avatar');
+                var initials = document.getElementById('user-avatar-initials');
+                if (user.imageUrl) {
+                    img.src = user.imageUrl;
+                    img.style.display = '';
+                    initials.style.display = 'none';
+                } else {
+                    var first = (user.firstName || '').charAt(0).toUpperCase();
+                    var last  = (user.lastName  || '').charAt(0).toUpperCase();
+                    initials.textContent = first + last || '?';
+                }
+
+                // Name & email
+                var fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+                document.getElementById('user-full-name').textContent = fullName || 'No name set';
+
+                var primaryEmail = user.primaryEmailAddress;
+                document.getElementById('user-email').textContent =
+                    primaryEmail ? primaryEmail.emailAddress : '';
+
+                if (user.username) {
+                    document.getElementById('user-username').textContent = '@' + user.username;
+                }
+
+                // User ID
+                document.getElementById('user-id').textContent = user.id;
+
+                // Organisation (if any)
+                var org = window.Clerk.organization;
+                if (org) {
+                    document.getElementById('user-org').textContent = org.name;
+                    document.getElementById('org-section').style.display = '';
+                }
+
+                // Member since
+                if (user.createdAt) {
+                    document.getElementById('user-created').textContent =
+                        new Date(user.createdAt).toLocaleDateString(undefined, {
+                            year: 'numeric', month: 'long', day: 'numeric'
+                        });
+                }
+
+                // Sign-out
+                var btn = document.getElementById('sign-out-btn');
+                if (btn) {
+                    btn.addEventListener('click', async function () {
+                        await window.Clerk.signOut();
+                        window.location.reload();
+                    });
+                }
+            }, 100);
+        })();
+        </script>
+    #endexport
+#endextend
