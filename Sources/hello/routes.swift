@@ -3,7 +3,7 @@ import ClerkVapor
 
 func routes(_ app: Application) throws {
     app.get { req async in
-        "It works!"
+        return req.redirect(to: "/dashboard")
     }
 
     app.get("hello") { req async throws -> View in
@@ -11,7 +11,7 @@ func routes(_ app: Application) throws {
     
     app.get("dashboard") { req async throws -> View in
         try await req.clerkView("dashboard", context: [
-            "appName": "My App",
+            "appName": "bug-free-memory",
             "pageTitle": "Dashboard",
         ])
     }
