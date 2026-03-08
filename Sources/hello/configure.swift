@@ -1,5 +1,6 @@
 import Vapor
-import LeafKit
+import Fluent
+import FluentPostgresDriver
 import Leaf
 import ClerkVapor
 import ClerkLeaf
@@ -9,6 +10,12 @@ public func configure(_ app: Application) async throws {
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
+    let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
+    try app.databases.use(.postgres(url: databaseURL), as: .psql)
+
+    // Register migrations
+    try await app.autoMigrate()
+
     app.useClerk(ClerkConfiguration(
             secretKey: Environment.get("CLERK_SECRET_KEY")!,
             publishableKey: Environment.get("CLERK_PUBLISHABLE_KEY"),
