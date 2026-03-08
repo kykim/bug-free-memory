@@ -1,3 +1,4 @@
+import NIOSSL
 import Vapor
 import Fluent
 import FluentPostgresDriver
@@ -11,7 +12,15 @@ public func configure(_ app: Application) async throws {
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
-    try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
+//    try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
+    
+    var tlsConfig = TLSConfiguration.makeClientConfiguration()
+    tlsConfig.certificateVerification = .none  // disables cert verification
+
+    var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
+    postgresConfig.coreConfiguration.tls = .require(try NIOSSLContext(configuration: tlsConfig))
+
+    app.databases.use(.postgres(configuration: postgresConfig, maxConnectionsPerEventLoop: 1), as: .psql)
 
     // Register migrations
     app.migrations.add(CreateCurrencies())       // no deps
