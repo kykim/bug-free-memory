@@ -13,13 +13,8 @@ public func configure(_ app: Application) async throws {
     
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
 //    try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
-    
-    var tlsConfig = TLSConfiguration.makeClientConfiguration()
-    tlsConfig.certificateVerification = .none  // disables cert verification
-
     var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
-    postgresConfig.coreConfiguration.tls = .require(try NIOSSLContext(configuration: tlsConfig))
-
+    postgresConfig.coreConfiguration.tls = .disable
     app.databases.use(.postgres(configuration: postgresConfig, maxConnectionsPerEventLoop: 1), as: .psql)
 
     // Register migrations
