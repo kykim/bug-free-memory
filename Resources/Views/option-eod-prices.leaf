@@ -1,0 +1,120 @@
+#extend("base"):
+#export("title"):Option EOD Prices#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"):active#endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+
+<div class="page-header">
+    <div class="page-title">option eod prices<small>end-of-day option prices &amp; greeks (latest 200)</small></div>
+    <div class="row-count"><strong>#count(prices)</strong> records</div>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Insert option EOD price</div>
+    <form method="POST" action="/option-eod-prices">
+        <div class="form-row">
+            <div class="form-group fg-md">
+                <label>Instrument</label>
+                <select name="instrument_id" required>
+                    #for(inst in instruments):
+                    <option value="#(inst.id)">#(inst.ticker)</option>
+                    #endfor
+                </select>
+            </div>
+            <div class="form-group fg-md"><label>Date</label><input type="date" name="price_date" required></div>
+            <div class="form-group fg-sm"><label>Bid</label>  <input type="number" step="0.000001" name="bid"   placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Ask</label>  <input type="number" step="0.000001" name="ask"   placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Last</label> <input type="number" step="0.000001" name="last"  placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Settle</label><input type="number" step="0.000001" name="settlement_price" placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Volume</label><input type="number" name="volume"   placeholder="0"></div>
+            <div class="form-group fg-sm"><label>OI</label>   <input type="number" name="open_interest" placeholder="0"></div>
+            <div class="form-group fg-sm"><label>IV</label>   <input type="number" step="0.000001" name="implied_volatility" placeholder="0.25"></div>
+            <div class="form-group fg-sm"><label>Delta</label><input type="number" step="0.000001" name="delta" placeholder="0.50"></div>
+            <div class="form-group fg-sm"><label>Gamma</label><input type="number" step="0.000001" name="gamma" placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Theta</label><input type="number" step="0.000001" name="theta" placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Vega</label> <input type="number" step="0.000001" name="vega"  placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Rho</label>  <input type="number" step="0.000001" name="rho"   placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Und. Price</label><input type="number" step="0.000001" name="underlying_price" placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>RFR</label>  <input type="number" step="0.000001" name="risk_free_rate"   placeholder="0.05"></div>
+            <div class="form-group fg-sm"><label>Div Yield</label><input type="number" step="0.000001" name="dividend_yield" placeholder="0.00"></div>
+            <div class="form-group fg-md"><label>Source</label><input type="text" name="source" placeholder="cboe"></div>
+            <button type="submit" class="btn btn-primary">Insert</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>ID</th><th>Ticker</th><th>Date</th><th>Bid</th><th>Ask</th><th>Mid</th><th>Last</th><th>OI</th><th>IV</th><th>Δ</th><th>Γ</th><th>Θ</th><th>V</th><th>Und.</th><th>Source</th><th></th></tr></thead>
+        <tbody>
+        #if(prices):
+            #for(p in prices):
+            <tr id="row-#(p.id)">
+                <td class="td-muted">#(p.id)</td>
+                <td class="td-accent">#(p.instrument.ticker)</td>
+                <td class="td-mono">#(p.priceDate)</td>
+                <td class="td-mono">#(p.bid)</td>
+                <td class="td-mono">#(p.ask)</td>
+                <td class="td-mono">#(p.mid)</td>
+                <td class="td-mono">#(p.last)</td>
+                <td class="td-muted">#(p.openInterest)</td>
+                <td class="td-mono">#(p.impliedVolatility)</td>
+                <td class="td-mono">#(p.delta)</td>
+                <td class="td-mono">#(p.gamma)</td>
+                <td class="td-mono">#(p.theta)</td>
+                <td class="td-mono">#(p.vega)</td>
+                <td class="td-mono">#(p.underlyingPrice)</td>
+                <td class="td-muted">#(p.source)</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit(#(p.id))">Edit</button>
+                    <form method="POST" action="/option-eod-prices/#(p.id)/delete" onsubmit="return confirm('Delete option price #(p.id)?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(p.id)" style="display:none">
+                <td colspan="16">
+                    <form method="POST" action="/option-eod-prices/#(p.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="bid"               value="#(p.bid)"             placeholder="Bid">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="ask"               value="#(p.ask)"             placeholder="Ask">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="last"              value="#(p.last)"            placeholder="Last">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="settlement_price"  value="#(p.settlementPrice)" placeholder="Settle">
+                            <input class="edit-input edit-input-sm" type="number"                 name="volume"            value="#(p.volume)"          placeholder="Vol">
+                            <input class="edit-input edit-input-sm" type="number"                 name="open_interest"     value="#(p.openInterest)"    placeholder="OI">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="implied_volatility"value="#(p.impliedVolatility)"placeholder="IV">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="delta"             value="#(p.delta)"           placeholder="Δ">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="gamma"             value="#(p.gamma)"           placeholder="Γ">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="theta"             value="#(p.theta)"           placeholder="Θ">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="vega"              value="#(p.vega)"            placeholder="V">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="rho"               value="#(p.rho)"             placeholder="Rho">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="underlying_price"  value="#(p.underlyingPrice)" placeholder="Und.">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="risk_free_rate"    value="#(p.riskFreeRate)"    placeholder="RFR">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="dividend_yield"    value="#(p.dividendYield)"   placeholder="Div">
+                            <input class="edit-input edit-input-md" type="text"                   name="source"            value="#(p.source)"          placeholder="Source">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(p.id))">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="16"><div class="empty">No option EOD price records found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend

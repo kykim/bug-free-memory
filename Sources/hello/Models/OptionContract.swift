@@ -56,9 +56,6 @@ final class OptionContract: Model, Content, @unchecked Sendable {
     // Relations
 //    @Children(for: \.$instrument)
 //    var eodPrices: [OptionEODPrice]
-//
-//    @Children(for: \.$instrument)
-//    var intradayPrices: [OptionIntradayPrice]
 
     init() {}
 

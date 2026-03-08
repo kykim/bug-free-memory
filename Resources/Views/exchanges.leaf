@@ -1,0 +1,76 @@
+#extend("base"):
+#export("title"):Exchanges#endexport
+#export("nav_exchanges"):active#endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+
+<div class="page-header">
+    <div class="page-title">exchanges<small>iso 10383 market identifier codes</small></div>
+    <div class="row-count"><strong>#count(exchanges)</strong> records</div>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Insert new exchange</div>
+    <form method="POST" action="/exchanges">
+        <div class="form-row">
+            <div class="form-group fg-sm"><label>MIC Code</label><input type="text" name="mic_code" placeholder="XNYS" maxlength="4" required></div>
+            <div class="form-group fg-xl"><label>Name</label><input type="text" name="name" placeholder="New York Stock Exchange" required></div>
+            <div class="form-group fg-sm"><label>Country</label><input type="text" name="country_code" placeholder="US" maxlength="2" required></div>
+            <div class="form-group fg-lg"><label>Timezone</label><input type="text" name="timezone" placeholder="America/New_York" required></div>
+            <button type="submit" class="btn btn-primary">Insert</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>MIC</th><th>Name</th><th>Country</th><th>Timezone</th><th></th></tr></thead>
+        <tbody>
+        #if(exchanges):
+            #for(exchange in exchanges):
+            <tr id="row-#(exchange.id)">
+                <td class="td-accent">#(exchange.micCode)</td>
+                <td class="td-mono">#(exchange.name)</td>
+                <td class="td-muted">#(exchange.countryCode)</td>
+                <td class="td-muted">#(exchange.timezone)</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit(#(exchange.id))">Edit</button>
+                    <form method="POST" action="/exchanges/#(exchange.id)/delete" onsubmit="return confirm('Delete #(exchange.micCode)?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(exchange.id)" style="display:none">
+                <td colspan="5">
+                    <form method="POST" action="/exchanges/#(exchange.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-sm" type="text" value="#(exchange.micCode)" disabled>
+                            <input class="edit-input edit-input-xl" type="text" name="name" value="#(exchange.name)" required>
+                            <input class="edit-input edit-input-sm" type="text" name="country_code" value="#(exchange.countryCode)" maxlength="2" required>
+                            <input class="edit-input edit-input-lg" type="text" name="timezone" value="#(exchange.timezone)" required>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(exchange.id))">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="5"><div class="empty">No exchanges found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend

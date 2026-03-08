@@ -1,394 +1,70 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Currencies — Market Data</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+#extend("base"):
+#export("title"):Currencies#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"):active#endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
 
-        :root {
-            --bg:        #0a0c0f;
-            --surface:   #111318;
-            --border:    #1e2229;
-            --border-hi: #2e3340;
-            --text:      #e2e6ed;
-            --muted:     #5a6172;
-            --accent:    #00d4aa;
-            --accent-dim:#004d3e;
-            --danger:    #ff4d6a;
-            --danger-dim:#3d0014;
-            --warn:      #f5a623;
-            --mono:      'IBM Plex Mono', monospace;
-            --sans:      'IBM Plex Sans', sans-serif;
-        }
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
 
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: var(--sans);
-            font-size: 14px;
-            min-height: 100vh;
-            padding: 0;
-        }
+<div class="page-header">
+    <div class="page-title">currencies<small>iso 4217 reference data</small></div>
+    <div class="row-count"><strong>#count(currencies)</strong> records</div>
+</div>
 
-        /* ── Header ── */
-        header {
-            border-bottom: 1px solid var(--border);
-            padding: 0 40px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            background: var(--surface);
-        }
-        .logo {
-            font-family: var(--mono);
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            color: var(--accent);
-        }
-        .breadcrumb {
-            font-family: var(--mono);
-            font-size: 11px;
-            color: var(--muted);
-            letter-spacing: 0.05em;
-        }
-        .breadcrumb span { color: var(--muted); margin: 0 6px; }
-
-        /* ── Layout ── */
-        main {
-            max-width: 960px;
-            margin: 0 auto;
-            padding: 40px 40px 80px;
-        }
-
-        /* ── Page title ── */
-        .page-header {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-            margin-bottom: 32px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-        }
-        .page-title {
-            font-family: var(--mono);
-            font-size: 22px;
-            font-weight: 600;
-            letter-spacing: -0.02em;
-            color: var(--text);
-        }
-        .page-title small {
-            display: block;
-            font-size: 11px;
-            font-weight: 400;
-            color: var(--muted);
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            margin-top: 4px;
-        }
-        .row-count {
-            font-family: var(--mono);
-            font-size: 11px;
-            color: var(--muted);
-            letter-spacing: 0.06em;
-        }
-        .row-count strong { color: var(--accent); }
-
-        /* ── Flash messages ── */
-        .flash {
-            padding: 12px 16px;
-            border-radius: 4px;
-            font-family: var(--mono);
-            font-size: 12px;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            animation: fadeIn 0.25s ease;
-        }
-        .flash.success { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); }
-        .flash.error   { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); }
-        .flash::before { font-size: 14px; }
-        .flash.success::before { content: "✓"; }
-        .flash.error::before   { content: "✕"; }
-
-        /* ── Insert form ── */
-        .insert-panel {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 24px;
-            margin-bottom: 32px;
-        }
-        .panel-label {
-            font-family: var(--mono);
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: var(--muted);
-            margin-bottom: 16px;
-        }
-        .form-row {
-            display: flex;
-            gap: 12px;
-            align-items: flex-end;
-        }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .form-group label {
-            font-family: var(--mono);
-            font-size: 10px;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: var(--muted);
-        }
-        .form-group input {
-            background: var(--bg);
-            border: 1px solid var(--border-hi);
-            border-radius: 4px;
-            color: var(--text);
-            font-family: var(--mono);
-            font-size: 13px;
-            padding: 8px 12px;
-            outline: none;
-            transition: border-color 0.15s;
-            width: 100%;
-        }
-        .form-group input:focus { border-color: var(--accent); }
-        .form-group input::placeholder { color: var(--muted); }
-        .fg-code  { width: 100px; }
-        .fg-name  { flex: 1; }
-
-        /* ── Buttons ── */
-        .btn {
-            font-family: var(--mono);
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            border: none;
-            border-radius: 4px;
-            padding: 9px 18px;
-            cursor: pointer;
-            transition: opacity 0.15s, transform 0.1s;
-            white-space: nowrap;
-        }
-        .btn:hover  { opacity: 0.85; }
-        .btn:active { transform: scale(0.97); }
-        .btn-primary { background: var(--accent); color: #000; }
-        .btn-ghost   { background: transparent; border: 1px solid var(--border-hi); color: var(--muted); }
-        .btn-ghost:hover { border-color: var(--text); color: var(--text); opacity: 1; }
-        .btn-danger  { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); }
-
-        /* ── Table ── */
-        .table-wrap {
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-        table { width: 100%; border-collapse: collapse; }
-        thead tr {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border-hi);
-        }
-        th {
-            font-family: var(--mono);
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--muted);
-            padding: 12px 16px;
-            text-align: left;
-        }
-        tbody tr {
-            border-bottom: 1px solid var(--border);
-            transition: background 0.1s;
-        }
-        tbody tr:last-child { border-bottom: none; }
-        tbody tr:hover { background: var(--surface); }
-        td {
-            padding: 13px 16px;
-            vertical-align: middle;
-        }
-        .td-code {
-            font-family: var(--mono);
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--accent);
-            letter-spacing: 0.06em;
-            width: 100px;
-        }
-        .td-name {
-            font-size: 13px;
-            color: var(--text);
-        }
-        .td-actions {
-            width: 160px;
-            text-align: right;
-        }
-        .action-group { display: flex; gap: 8px; justify-content: flex-end; }
-
-        /* ── Inline edit row ── */
-        .edit-row td { padding: 8px 16px; background: #0d1219; }
-        .edit-form-row { display: flex; gap: 8px; align-items: center; }
-        .edit-input {
-            background: var(--bg);
-            border: 1px solid var(--accent);
-            border-radius: 4px;
-            color: var(--text);
-            font-family: var(--mono);
-            font-size: 13px;
-            padding: 7px 10px;
-            outline: none;
-        }
-        .edit-input-code { width: 90px; }
-        .edit-input-name { flex: 1; }
-
-        /* ── Empty state ── */
-        .empty {
-            padding: 48px 16px;
-            text-align: center;
-            font-family: var(--mono);
-            font-size: 12px;
-            color: var(--muted);
-            letter-spacing: 0.06em;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-6px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-</head>
-<body>
-
-<header>
-    <div class="logo">MarketData</div>
-    <div class="breadcrumb">
-        Reference Data <span>/</span> Currencies
-    </div>
-</header>
-
-<main>
-
-    <!-- Flash messages -->
-    #if(flash):
-        <div class="flash #(flashType)">#(flash)</div>
-    #endif
-
-    <!-- Page heading -->
-    <div class="page-header">
-        <div class="page-title">
-            currencies
-            <small>iso 4217 reference data</small>
+<div class="insert-panel">
+    <div class="panel-label">Insert new currency</div>
+    <form method="POST" action="/currencies">
+        <div class="form-row">
+            <div class="form-group fg-sm"><label>Code</label><input type="text" name="currency_code" placeholder="USD" maxlength="3" required></div>
+            <div class="form-group fg-xl"><label>Name</label><input type="text" name="name" placeholder="US Dollar" required></div>
+            <button type="submit" class="btn btn-primary">Insert</button>
         </div>
-        <div class="row-count"><strong>#count(currencies)</strong> records</div>
-    </div>
+    </form>
+</div>
 
-    <!-- Insert form -->
-    <div class="insert-panel">
-        <div class="panel-label">Insert new currency</div>
-        <form method="POST" action="/currencies">
-            <div class="form-row">
-                <div class="form-group fg-code">
-                    <label>Code</label>
-                    <input type="text" name="currency_code" placeholder="USD" maxlength="3" required>
-                </div>
-                <div class="form-group fg-name">
-                    <label>Name</label>
-                    <input type="text" name="name" placeholder="US Dollar" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Insert</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- Table -->
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Code</th>
-                    <th>Name</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                #if(currencies):
-                    #for(currency in currencies):
-                        <!-- View row -->
-                        <tr id="row-#(currency.id)">
-                            <td class="td-code">#(currency.id)</td>
-                            <td class="td-name">#(currency.name)</td>
-                            <td class="td-actions">
-                                <div class="action-group">
-                                    <button class="btn btn-ghost"
-                                            onclick="showEdit('#(currency.id)', '#(currency.name)')">
-                                        Edit
-                                    </button>
-                                    <form method="POST" action="/currencies/#(currency.id)/delete"
-                                          onsubmit="return confirm('Delete #(currency.id)?')">
-                                        <button type="submit" class="btn btn-danger">Delete</button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        <!-- Inline edit row (hidden by default) -->
-                        <tr class="edit-row" id="edit-#(currency.id)" style="display:none">
-                            <td colspan="3">
-                                <form method="POST" action="/currencies/#(currency.id)/edit">
-                                    <div class="edit-form-row">
-                                        <input class="edit-input edit-input-code"
-                                               type="text" value="#(currency.id)" disabled>
-                                        <input class="edit-input edit-input-name"
-                                               type="text" name="name" id="edit-name-#(currency.id)"
-                                               value="#(currency.name)" required>
-                                        <button type="submit" class="btn btn-primary">Save</button>
-                                        <button type="button" class="btn btn-ghost"
-                                                onclick="hideEdit('#(currency.id)')">Cancel</button>
-                                    </div>
-                                </form>
-                            </td>
-                        </tr>
-                    #endfor
-                #else:
-                    <tr>
-                        <td colspan="3">
-                            <div class="empty">No currencies found — insert one above.</div>
-                        </td>
-                    </tr>
-                #endif
-            </tbody>
-        </table>
-    </div>
-
-</main>
-
-<script>
-    function showEdit(code, name) {
-        document.getElementById('row-' + code).style.display = 'none';
-        const editRow = document.getElementById('edit-' + code);
-        editRow.style.display = 'table-row';
-        document.getElementById('edit-name-' + code).focus();
-    }
-
-    function hideEdit(code) {
-        document.getElementById('edit-' + code).style.display = 'none';
-        document.getElementById('row-' + code).style.display = 'table-row';
-    }
-</script>
-
-</body>
-</html>
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Code</th><th>Name</th><th></th></tr></thead>
+        <tbody>
+        #if(currencies):
+            #for(currency in currencies):
+            <tr id="row-#(currency.id)">
+                <td class="td-accent">#(currency.id)</td>
+                <td class="td-mono">#(currency.name)</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit('#(currency.id)')">Edit</button>
+                    <form method="POST" action="/currencies/#(currency.id)/delete" onsubmit="return confirm('Delete #(currency.id)?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(currency.id)" style="display:none">
+                <td colspan="3">
+                    <form method="POST" action="/currencies/#(currency.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-sm" type="text" value="#(currency.id)" disabled>
+                            <input class="edit-input edit-input-xl" type="text" name="name" value="#(currency.name)" required>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit('#(currency.id)')">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="3"><div class="empty">No currencies found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend

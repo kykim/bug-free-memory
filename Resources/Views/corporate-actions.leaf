@@ -1,0 +1,102 @@
+#extend("base"):
+#export("title"):Corporate Actions#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"):active#endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+
+<div class="page-header">
+    <div class="page-title">corporate actions<small>splits, dividends &amp; other events</small></div>
+    <div class="row-count"><strong>#count(actions)</strong> records</div>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Insert corporate action</div>
+    <form method="POST" action="/corporate-actions">
+        <div class="form-row">
+            <div class="form-group fg-md">
+                <label>Instrument</label>
+                <select name="instrument_id" required>
+                    #for(inst in instruments):
+                    <option value="#(inst.id)">#(inst.ticker) — #(inst.name)</option>
+                    #endfor
+                </select>
+            </div>
+            <div class="form-group fg-md">
+                <label>Action Type</label>
+                <select name="action_type" required>
+                    <option value="split">Split</option>
+                    <option value="reverse_split">Reverse Split</option>
+                    <option value="dividend_cash">Cash Dividend</option>
+                    <option value="dividend_stock">Stock Dividend</option>
+                    <option value="spinoff">Spinoff</option>
+                    <option value="merger">Merger</option>
+                    <option value="delisting">Delisting</option>
+                </select>
+            </div>
+            <div class="form-group fg-md"><label>Ex-Date</label>    <input type="date" name="ex_date"     required></div>
+            <div class="form-group fg-md"><label>Record Date</label><input type="date" name="record_date"></div>
+            <div class="form-group fg-md"><label>Pay Date</label>   <input type="date" name="pay_date"></div>
+            <div class="form-group fg-sm"><label>Ratio</label>      <input type="number" step="0.00000001" name="ratio" placeholder="2.0"></div>
+            <div class="form-group fg-xl"><label>Notes</label>      <input type="text" name="notes" placeholder="Optional notes"></div>
+            <button type="submit" class="btn btn-primary">Insert</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>ID</th><th>Ticker</th><th>Type</th><th>Ex-Date</th><th>Record Date</th><th>Pay Date</th><th>Ratio</th><th>Notes</th><th></th></tr></thead>
+        <tbody>
+        #if(actions):
+            #for(action in actions):
+            <tr id="row-#(action.id)">
+                <td class="td-muted">#(action.id)</td>
+                <td class="td-accent">#(action.instrument.ticker)</td>
+                <td class="td-mono"><span class="badge badge-active">#(action.actionType)</span></td>
+                <td class="td-mono">#(action.exDate)</td>
+                <td class="td-muted">#(action.recordDate)</td>
+                <td class="td-muted">#(action.payDate)</td>
+                <td class="td-mono">#(action.ratio)</td>
+                <td class="td-muted">#(action.notes)</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit(#(action.id))">Edit</button>
+                    <form method="POST" action="/corporate-actions/#(action.id)/delete" onsubmit="return confirm('Delete action #(action.id)?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(action.id)" style="display:none">
+                <td colspan="9">
+                    <form method="POST" action="/corporate-actions/#(action.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-md" type="date"                   name="ex_date"     value="#(action.exDate)"     required>
+                            <input class="edit-input edit-input-md" type="date"                   name="record_date" value="#(action.recordDate)">
+                            <input class="edit-input edit-input-md" type="date"                   name="pay_date"    value="#(action.payDate)">
+                            <input class="edit-input edit-input-sm" type="number" step="0.00000001" name="ratio"     value="#(action.ratio)"      placeholder="Ratio">
+                            <input class="edit-input edit-input-xl" type="text"                   name="notes"       value="#(action.notes)"      placeholder="Notes">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(action.id))">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="9"><div class="empty">No corporate actions found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend

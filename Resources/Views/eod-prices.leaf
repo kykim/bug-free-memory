@@ -1,0 +1,100 @@
+#extend("base"):
+#export("title"):EOD Prices#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"):active#endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+
+<div class="page-header">
+    <div class="page-title">eod prices<small>end-of-day ohlcv data (latest 200)</small></div>
+    <div class="row-count"><strong>#count(prices)</strong> records</div>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Insert EOD price</div>
+    <form method="POST" action="/eod-prices">
+        <div class="form-row">
+            <div class="form-group fg-md">
+                <label>Instrument</label>
+                <select name="instrument_id" required>
+                    #for(inst in instruments):
+                    <option value="#(inst.id)">#(inst.ticker)</option>
+                    #endfor
+                </select>
+            </div>
+            <div class="form-group fg-md"><label>Date</label><input type="date" name="price_date" required></div>
+            <div class="form-group fg-sm"><label>Open</label><input type="number" step="0.000001" name="open"      placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>High</label><input type="number" step="0.000001" name="high"      placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Low</label> <input type="number" step="0.000001" name="low"       placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Close</label><input type="number" step="0.000001" name="close"    placeholder="0.00" required></div>
+            <div class="form-group fg-sm"><label>Adj Close</label><input type="number" step="0.000001" name="adj_close" placeholder="0.00"></div>
+            <div class="form-group fg-sm"><label>Volume</label><input type="number" name="volume"   placeholder="0"></div>
+            <div class="form-group fg-sm"><label>VWAP</label><input type="number" step="0.000001" name="vwap"      placeholder="0.00"></div>
+            <div class="form-group fg-md"><label>Source</label><input type="text" name="source"     placeholder="bloomberg"></div>
+            <button type="submit" class="btn btn-primary">Insert</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>ID</th><th>Ticker</th><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Adj Close</th><th>Volume</th><th>VWAP</th><th>Source</th><th></th></tr></thead>
+        <tbody>
+        #if(prices):
+            #for(p in prices):
+            <tr id="row-#(p.id)">
+                <td class="td-muted">#(p.id)</td>
+                <td class="td-accent">#(p.instrument.ticker)</td>
+                <td class="td-mono">#(p.priceDate)</td>
+                <td class="td-mono">#(p.open)</td>
+                <td class="td-mono">#(p.high)</td>
+                <td class="td-mono">#(p.low)</td>
+                <td class="td-mono">#(p.close)</td>
+                <td class="td-mono">#(p.adjClose)</td>
+                <td class="td-muted">#(p.volume)</td>
+                <td class="td-mono">#(p.vwap)</td>
+                <td class="td-muted">#(p.source)</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit(#(p.id))">Edit</button>
+                    <form method="POST" action="/eod-prices/#(p.id)/delete" onsubmit="return confirm('Delete EOD price #(p.id)?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(p.id)" style="display:none">
+                <td colspan="12">
+                    <form method="POST" action="/eod-prices/#(p.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="open"      value="#(p.open)"     placeholder="Open">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="high"      value="#(p.high)"     placeholder="High">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="low"       value="#(p.low)"      placeholder="Low">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="close"     value="#(p.close)"    placeholder="Close" required>
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="adj_close" value="#(p.adjClose)" placeholder="Adj Close">
+                            <input class="edit-input edit-input-sm" type="number"                 name="volume"    value="#(p.volume)"   placeholder="Volume">
+                            <input class="edit-input edit-input-sm" type="number" step="0.000001" name="vwap"      value="#(p.vwap)"     placeholder="VWAP">
+                            <input class="edit-input edit-input-md" type="text"                   name="source"    value="#(p.source)"   placeholder="Source">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(p.id))">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="12"><div class="empty">No EOD price records found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend

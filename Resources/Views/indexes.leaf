@@ -1,0 +1,82 @@
+#extend("base"):
+#export("title"):Indexes#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"):active#endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+
+<div class="page-header">
+    <div class="page-title">indexes<small>market index details</small></div>
+    <div class="row-count"><strong>#count(indexes)</strong> records</div>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Insert index detail</div>
+    <form method="POST" action="/indexes">
+        <div class="form-row">
+            <div class="form-group fg-md">
+                <label>Instrument</label>
+                <select name="instrument_id" required>
+                    #for(inst in instruments):
+                    <option value="#(inst.id)">#(inst.ticker) — #(inst.name)</option>
+                    #endfor
+                </select>
+            </div>
+            <div class="form-group fg-md"><label>Index Family</label><input type="text" name="index_family" placeholder="S&amp;P"></div>
+            <div class="form-group fg-xl"><label>Methodology</label><input type="text" name="methodology" placeholder="Market-cap weighted"></div>
+            <div class="form-group fg-md"><label>Rebalance Freq</label><input type="text" name="rebalance_freq" placeholder="quarterly"></div>
+            <button type="submit" class="btn btn-primary">Insert</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Ticker</th><th>Index Family</th><th>Methodology</th><th>Rebalance Freq</th><th></th></tr></thead>
+        <tbody>
+        #if(indexes):
+            #for(idx in indexes):
+            <tr id="row-#(idx.id)">
+                <td class="td-accent">#(idx.instrument.ticker)</td>
+                <td class="td-mono">#(idx.indexFamily)</td>
+                <td class="td-muted">#(idx.methodology)</td>
+                <td class="td-muted">#(idx.rebalanceFreq)</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit(#(idx.id))">Edit</button>
+                    <form method="POST" action="/indexes/#(idx.id)/delete" onsubmit="return confirm('Delete index record?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(idx.id)" style="display:none">
+                <td colspan="5">
+                    <form method="POST" action="/indexes/#(idx.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-md" type="text" name="index_family"   value="#(idx.indexFamily)"   placeholder="Index Family">
+                            <input class="edit-input edit-input-xl" type="text" name="methodology"    value="#(idx.methodology)"   placeholder="Methodology">
+                            <input class="edit-input edit-input-md" type="text" name="rebalance_freq" value="#(idx.rebalanceFreq)" placeholder="Rebalance Freq">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(idx.id))">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="5"><div class="empty">No index records found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend

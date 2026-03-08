@@ -1,0 +1,119 @@
+#extend("base"):
+#export("title"):Instruments#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"):active#endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+
+<div class="page-header">
+    <div class="page-title">instruments<small>master instrument register</small></div>
+    <div class="row-count"><strong>#count(instruments)</strong> records</div>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Insert new instrument</div>
+    <form method="POST" action="/instruments">
+        <div class="form-row">
+            <div class="form-group fg-md">
+                <label>Type</label>
+                <select name="instrument_type" required>
+                    <option value="equity">Equity</option>
+                    <option value="index">Index</option>
+                    <option value="equity_option">Equity Option</option>
+                    <option value="index_option">Index Option</option>
+                </select>
+            </div>
+            <div class="form-group fg-sm"><label>Ticker</label><input type="text" name="ticker" placeholder="AAPL" required></div>
+            <div class="form-group fg-xl"><label>Name</label><input type="text" name="name" placeholder="Apple Inc." required></div>
+            <div class="form-group fg-md">
+                <label>Exchange</label>
+                <select name="exchange_id">
+                    <option value="">— None —</option>
+                    #for(exchange in exchanges):
+                    <option value="#(exchange.id)">#(exchange.micCode) — #(exchange.name)</option>
+                    #endfor
+                </select>
+            </div>
+            <div class="form-group fg-md">
+                <label>Currency</label>
+                <select name="currency_code" required>
+                    #for(currency in currencies):
+                    <option value="#(currency.id)">#(currency.id) — #(currency.name)</option>
+                    #endfor
+                </select>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" name="is_active" id="ins_active" checked>
+                <label for="ins_active">Active</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Insert</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>ID</th><th>Ticker</th><th>Type</th><th>Name</th><th>Exchange</th><th>Currency</th><th>Active</th><th></th></tr></thead>
+        <tbody>
+        #if(instruments):
+            #for(inst in instruments):
+            <tr id="row-#(inst.id)">
+                <td class="td-muted">#(inst.id)</td>
+                <td class="td-accent">#(inst.ticker)</td>
+                <td class="td-mono"><span class="badge badge-active">#(inst.instrumentType)</span></td>
+                <td class="td-mono">#(inst.name)</td>
+                <td class="td-muted">#(inst.exchangeID)</td>
+                <td class="td-muted">#(inst.currencyCode)</td>
+                <td class="td-muted">#if(inst.isActive):✓#endif</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit(#(inst.id))">Edit</button>
+                    <form method="POST" action="/instruments/#(inst.id)/delete" onsubmit="return confirm('Delete #(inst.ticker)?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(inst.id)" style="display:none">
+                <td colspan="8">
+                    <form method="POST" action="/instruments/#(inst.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-xl" type="text" name="name" value="#(inst.name)" required>
+                            <select class="edit-select" name="exchange_id">
+                                <option value="">— None —</option>
+                                #for(exchange in exchanges):
+                                <option value="#(exchange.id)">#(exchange.micCode)</option>
+                                #endfor
+                            </select>
+                            <select class="edit-select" name="currency_code" required>
+                                #for(currency in currencies):
+                                <option value="#(currency.id)">#(currency.id)</option>
+                                #endfor
+                            </select>
+                            <div class="checkbox-group">
+                                <input type="checkbox" name="is_active" id="edit-active-#(inst.id)" #if(inst.isActive):checked#endif>
+                                <label for="edit-active-#(inst.id)">Active</label>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(inst.id))">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="8"><div class="empty">No instruments found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend

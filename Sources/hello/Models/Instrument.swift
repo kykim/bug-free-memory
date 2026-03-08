@@ -1,11 +1,3 @@
-//
-//  Instrument.swift
-//  hello
-//
-//  Created by Kevin Y Kim on 3/7/26.
-//
-
-
 import Fluent
 import Vapor
 
@@ -81,4 +73,8 @@ final class Instrument: Model, Content, @unchecked Sendable {
         self.$currency.id = currencyCode
         self.isActive = isActive
     }
+
+    // Plain accessors for Leaf templates (which can't use $ property wrapper syntax)
+    var exchangeID: Int?   { $exchange.id }
+    var currencyCode: String { $currency.id }
 }

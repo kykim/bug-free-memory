@@ -12,10 +12,7 @@ public func configure(_ app: Application) async throws {
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
-//    try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
-    var postgresConfig = try SQLPostgresConfiguration(url: databaseURL)
-    postgresConfig.coreConfiguration.tls = .disable
-    app.databases.use(.postgres(configuration: postgresConfig, maxConnectionsPerEventLoop: 1), as: .psql)
+    try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
 
     // Register migrations
     app.migrations.add(CreateCurrencies())       // no deps
@@ -31,18 +28,26 @@ public func configure(_ app: Application) async throws {
     try await app.autoMigrate()
 
     app.useClerk(ClerkConfiguration(
-            secretKey: Environment.get("CLERK_SECRET_KEY")!,
-            publishableKey: Environment.get("CLERK_PUBLISHABLE_KEY"),
-            // Optional: PEM key for networkless JWT verification
-            // jwtKey: Environment.get("CLERK_JWT_KEY"),
-            authorizedParties: ["https://bug-free-memory-4mtc.onrender.com", "http://localhost:8080"]
-        ))
+        secretKey: Environment.get("CLERK_SECRET_KEY")!,
+        publishableKey: Environment.get("CLERK_PUBLISHABLE_KEY"),
+        // Optional: PEM key for networkless JWT verification
+        // jwtKey: Environment.get("CLERK_JWT_KEY"),
+        authorizedParties: ["https://bug-free-memory-4mtc.onrender.com", "http://localhost:8080"]
+    ))
     app.useClerkLeaf()               // registers tags + enables Leaf renderer
     app.addClerkLeafSources()        // registers both your app's Views + the bundled Clerk templates
     app.registerClerkRoutes()        // optional: adds /sign-in, /sign-up, /profile routes
 
     // register routes
     try app.register(collection: CurrencyController())
+    try app.register(collection: ExchangeController())
+    try app.register(collection: InstrumentController())
+    try app.register(collection: EquityController())
+    try app.register(collection: IndexController())
+    try app.register(collection: OptionContractController())
+    try app.register(collection: EODPriceController())
+    try app.register(collection: OptionEODPriceController())
+    try app.register(collection: CorporateActionController())
     try routes(app)
 }
 

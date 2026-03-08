@@ -1,5 +1,5 @@
 {
-  "originHash" : "7748b4635991217e30f8f37394a1d0ca372254f83c9b64ffe9c1f92cabba5503",
+  "originHash" : "b3b4fdab2032528aafa7558736023f408323372943aafd97f5b2e536bf4276de",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/kykim/clerk-vapor.git",
       "state" : {
-        "revision" : "50dccbef16e6d2413f998dd423c9ac5e66085ce2",
-        "version" : "0.0.3"
+        "revision" : "e2593fc4d943d1cfaa9a05e5e34bffcd8546ad10",
+        "version" : "0.0.6"
       }
     },
     {

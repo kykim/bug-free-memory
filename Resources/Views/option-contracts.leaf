@@ -1,0 +1,116 @@
+#extend("base"):
+#export("title"):Option Contracts#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"):active#endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+
+<div class="page-header">
+    <div class="page-title">option contracts<small>equity &amp; index option specifications</small></div>
+    <div class="row-count"><strong>#count(contracts)</strong> records</div>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Insert option contract</div>
+    <form method="POST" action="/option-contracts">
+        <div class="form-row">
+            <div class="form-group fg-sm"><label>Instrument ID</label><input type="number" name="instrument_id" placeholder="ID" required></div>
+            <div class="form-group fg-md">
+                <label>Underlying</label>
+                <select name="underlying_id" required>
+                    #for(u in underlyings):
+                    <option value="#(u.id)">#(u.ticker)</option>
+                    #endfor
+                </select>
+            </div>
+            <div class="form-group fg-sm">
+                <label>Type</label>
+                <select name="option_type" required>
+                    <option value="call">Call</option>
+                    <option value="put">Put</option>
+                </select>
+            </div>
+            <div class="form-group fg-sm">
+                <label>Style</label>
+                <select name="exercise_style" required>
+                    <option value="american">American</option>
+                    <option value="european">European</option>
+                    <option value="bermudan">Bermudan</option>
+                </select>
+            </div>
+            <div class="form-group fg-sm"><label>Strike</label><input type="number" step="0.01" name="strike_price" placeholder="150.00" required></div>
+            <div class="form-group fg-md"><label>Expiration</label><input type="date" name="expiration_date" required></div>
+            <div class="form-group fg-sm"><label>Multiplier</label><input type="number" step="0.01" name="contract_multiplier" value="100"></div>
+            <div class="form-group fg-sm">
+                <label>Settlement</label>
+                <select name="settlement_type">
+                    <option value="physical">Physical</option>
+                    <option value="cash">Cash</option>
+                </select>
+            </div>
+            <div class="form-group fg-lg"><label>OSI Symbol</label><input type="text" name="osi_symbol" placeholder="AAPL 240119C00150000"></div>
+            <button type="submit" class="btn btn-primary">Insert</button>
+        </div>
+    </form>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>ID</th><th>Underlying</th><th>Type</th><th>Style</th><th>Strike</th><th>Expiry</th><th>Mult.</th><th>Settlement</th><th>OSI</th><th></th></tr></thead>
+        <tbody>
+        #if(contracts):
+            #for(c in contracts):
+            <tr id="row-#(c.id)">
+                <td class="td-muted">#(c.id)</td>
+                <td class="td-accent">#(c.underlying.ticker)</td>
+                <td><span class="badge badge-#(c.optionType)">#(c.optionType)</span></td>
+                <td class="td-muted">#(c.exerciseStyle)</td>
+                <td class="td-mono">#(c.strikePrice)</td>
+                <td class="td-mono">#(c.expirationDate)</td>
+                <td class="td-muted">#(c.contractMultiplier)</td>
+                <td class="td-muted">#(c.settlementType)</td>
+                <td class="td-muted">#(c.osiSymbol)</td>
+                <td class="td-actions"><div class="action-group">
+                    <button class="btn btn-ghost" onclick="showEdit(#(c.id))">Edit</button>
+                    <form method="POST" action="/option-contracts/#(c.id)/delete" onsubmit="return confirm('Delete contract #(c.id)?')">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div></td>
+            </tr>
+            <tr class="edit-row" id="edit-#(c.id)" style="display:none">
+                <td colspan="10">
+                    <form method="POST" action="/option-contracts/#(c.id)/edit">
+                        <div class="edit-form-row">
+                            <input class="edit-input edit-input-sm" type="number" step="0.01" name="strike_price"        value="#(c.strikePrice)" required>
+                            <input class="edit-input edit-input-md" type="date"              name="expiration_date"      value="#(c.expirationDate)" required>
+                            <input class="edit-input edit-input-sm" type="number" step="0.01" name="contract_multiplier" value="#(c.contractMultiplier)" required>
+                            <select class="edit-select" name="settlement_type">
+                                <option value="physical" #if(c.settlementType == "physical"):selected#endif>Physical</option>
+                                <option value="cash"     #if(c.settlementType == "cash"):selected#endif>Cash</option>
+                            </select>
+                            <input class="edit-input edit-input-lg" type="text" name="osi_symbol" value="#(c.osiSymbol)" placeholder="OSI Symbol">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(c.id))">Cancel</button>
+                        </div>
+                    </form>
+                </td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="10"><div class="empty">No option contracts found — insert one above.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+#endexport
+#endextend
