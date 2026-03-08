@@ -11,9 +11,19 @@ public func configure(_ app: Application) async throws {
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
-    try app.databases.use(.postgres(url: databaseURL), as: .psql)
+    try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
 
     // Register migrations
+    app.migrations.add(CreateCurrencies())       // no deps
+    app.migrations.add(CreateExchanges())        // no deps
+    app.migrations.add(CreateInstruments())      // depends on currencies, exchanges
+    app.migrations.add(CreateEquities())         // depends on instruments
+    app.migrations.add(CreateIndexes())          // depends on instruments
+    app.migrations.add(CreateOptionContracts())  // depends on instruments
+    app.migrations.add(CreateEODPrices())        // depends on instruments
+    app.migrations.add(CreateOptionEODPrices())  // depends on instruments
+    app.migrations.add(CreateCorporateActions()) // depends on instruments
+
     try await app.autoMigrate()
 
     app.useClerk(ClerkConfiguration(
@@ -28,6 +38,7 @@ public func configure(_ app: Application) async throws {
     app.registerClerkRoutes()        // optional: adds /sign-in, /sign-up, /profile routes
 
     // register routes
+    try app.register(collection: CurrencyController())
     try routes(app)
 }
 

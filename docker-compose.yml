@@ -17,10 +17,7 @@ x-shared_environment: &shared_environment
   LOG_LEVEL: ${LOG_LEVEL:-debug}
   CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
   CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
-  DB_HOST: ${DB_HOST:-db}
-  DB_USER: ${DB_USER:-vapor}
-  DB_PASS: ${DB_PASS:-password}
-  DB_NAME: ${DB_NAME:-vapor}
+  DATABASE_URL: ${DATABASE_URL:-postgres://vapor:password@localhost:5432/vapor}
   
 services:
   app:
