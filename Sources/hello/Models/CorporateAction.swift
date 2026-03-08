@@ -28,7 +28,7 @@ final class CorporateAction: Model, Content, @unchecked Sendable {
     @Parent(key: "instrument_id")
     var instrument: Instrument
 
-    @Field(key: "action_type")
+    @Enum(key: "action_type")
     var actionType: CorporateActionType
 
     @Field(key: "ex_date")

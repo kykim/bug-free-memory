@@ -32,10 +32,10 @@ final class OptionContract: Model, Content, @unchecked Sendable {
     @Parent(key: "underlying_id")
     var underlying: Instrument
 
-    @Field(key: "option_type")
+    @Enum(key: "option_type")
     var optionType: OptionType
 
-    @Field(key: "exercise_style")
+    @Enum(key: "exercise_style")
     var exerciseStyle: ExerciseStyle
 
     @Field(key: "strike_price")

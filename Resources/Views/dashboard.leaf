@@ -129,14 +129,6 @@
             <!-- Signed in state -->
             <div class="clerk-signed-in">
 
-                <div class="page-header">
-                    <div class="page-title">
-                        dashboard
-                        <small>account overview</small>
-                    </div>
-                    <button class="btn btn-danger" id="sign-out-btn">Sign out</button>
-                </div>
-
                 <div class="profile-card">
                     <div class="profile-avatar">
                         <img id="user-avatar" src="" alt="Profile photo" style="display:none" />

@@ -14,7 +14,7 @@ final class Instrument: Model, Content, @unchecked Sendable {
     @ID(custom: "instrument_id", generatedBy: .database)
     var id: Int?
 
-    @Field(key: "instrument_type")
+    @Enum(key: "instrument_type")
     var instrumentType: InstrumentType
 
     @Field(key: "ticker")
