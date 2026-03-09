@@ -23,10 +23,10 @@ struct CreateOptionContracts: AsyncMigration {
             .create()
 
         try await database.schema("option_contracts")
-            .field("instrument_id", .int, .identifier(auto: false),
-                   .references("instruments", "instrument_id", onDelete: .cascade))
-            .field("underlying_id", .int, .required,
-                   .references("instruments", "instrument_id"))
+            .field("instrument_id", .uuid, .identifier(auto: false),
+                   .references("instruments", "id", onDelete: .cascade))
+            .field("underlying_id", .uuid, .required,
+                   .references("instruments", "id"))
             .field("option_type", optionTypeEnum, .required)
             .field("exercise_style", exerciseStyleEnum, .required)
             .field("strike_price", .double, .required)

@@ -11,11 +11,11 @@ struct CreateInstruments: AsyncMigration {
             .create()
 
         try await database.schema("instruments")
-            .field("instrument_id", .int, .identifier(auto: true))
+            .field("id", .uuid, .required, .identifier(auto: false))
             .field("instrument_type", instrumentTypeEnum, .required)
             .field("ticker", .string, .required)
             .field("name", .string, .required)
-            .field("exchange_id", .int, .references("exchanges", "exchange_id", onDelete: .setNull))
+            .field("exchange_id", .uuid, .references("exchanges", "id", onDelete: .setNull))
             .field("currency_code", .string, .required, .references("currencies", "currency_code"))
             .field("is_active", .bool, .required, .sql(.default(true)))
             .field("created_at", .datetime)

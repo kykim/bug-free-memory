@@ -35,7 +35,7 @@ struct CorporateActionController: RouteCollection {
     func create(req: Request) async throws -> Response {
         try requireAuth(req)
         struct Input: Content {
-            var instrument_id: Int; var action_type: String; var ex_date: String
+            var instrument_id: UUID; var action_type: String; var ex_date: String
             var record_date: String?; var pay_date: String?; var ratio: Double?; var notes: String?
         }
         let input = try req.content.decode(Input.self)
@@ -59,7 +59,7 @@ struct CorporateActionController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let action = try await CorporateAction.find(id, on: req.db) else {
             return flash(req, "Corporate action not found.", type: "error", to: "/corporate-actions")
         }
@@ -83,7 +83,7 @@ struct CorporateActionController: RouteCollection {
 
     func delete(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let action = try await CorporateAction.find(id, on: req.db) else {
             return flash(req, "Corporate action not found.", type: "error", to: "/corporate-actions")
         }

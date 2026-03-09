@@ -35,7 +35,7 @@ struct InstrumentController: RouteCollection {
         try requireAuth(req)
         struct Input: Content {
             var instrument_type: String; var ticker: String; var name: String
-            var exchange_id: Int?; var currency_code: String; var is_active: String?
+            var exchange_id: UUID?; var currency_code: String; var is_active: String?
         }
         let input = try req.content.decode(Input.self)
         guard let type = InstrumentType(rawValue: input.instrument_type) else {
@@ -52,11 +52,11 @@ struct InstrumentController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let instrument = try await Instrument.find(id, on: req.db) else {
             return flash(req, "Instrument not found.", type: "error", to: "/instruments")
         }
-        struct Input: Content { var name: String; var exchange_id: Int?; var currency_code: String; var is_active: String? }
+        struct Input: Content { var name: String; var exchange_id: UUID?; var currency_code: String; var is_active: String? }
         let input = try req.content.decode(Input.self)
         instrument.name = input.name
         instrument.$exchange.id = input.exchange_id
@@ -68,7 +68,7 @@ struct InstrumentController: RouteCollection {
 
     func delete(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let instrument = try await Instrument.find(id, on: req.db) else {
             return flash(req, "Instrument not found.", type: "error", to: "/instruments")
         }

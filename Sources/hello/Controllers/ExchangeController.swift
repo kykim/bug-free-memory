@@ -39,7 +39,7 @@ struct ExchangeController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let exchange = try await Exchange.find(id, on: req.db) else {
             return flash(req, "Exchange not found.", type: "error", to: "/exchanges")
         }
@@ -52,7 +52,7 @@ struct ExchangeController: RouteCollection {
 
     func delete(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let exchange = try await Exchange.find(id, on: req.db) else {
             return flash(req, "Exchange not found.", type: "error", to: "/exchanges")
         }

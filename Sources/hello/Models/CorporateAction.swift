@@ -22,8 +22,8 @@ enum CorporateActionType: String, Codable {
 final class CorporateAction: Model, Content, @unchecked Sendable {
     static let schema = "corporate_actions"
 
-    @ID(custom: "action_id", generatedBy: .database)
-    var id: Int?
+    @ID
+    var id: UUID?
 
     @Parent(key: "instrument_id")
     var instrument: Instrument
@@ -52,8 +52,8 @@ final class CorporateAction: Model, Content, @unchecked Sendable {
     init() {}
 
     init(
-        id: Int? = nil,
-        instrumentID: Int,
+        id: UUID? = nil,
+        instrumentID: UUID,
         actionType: CorporateActionType,
         exDate: Date,
         recordDate: Date? = nil,

@@ -12,9 +12,9 @@ import FluentSQL
 struct CreateEODPrices: AsyncMigration {
     func prepare(on database: any Database) async throws {
         try await database.schema("eod_prices")
-            .field("eod_price_id", .int, .identifier(auto: true))
-            .field("instrument_id", .int, .required,
-                   .references("instruments", "instrument_id", onDelete: .cascade))
+            .field("id", .uuid, .required, .identifier(auto: false))
+            .field("instrument_id", .uuid, .required,
+                   .references("instruments", "id", onDelete: .cascade))
             .field("price_date", .date, .required)
             .field("open", .double)
             .field("high", .double)

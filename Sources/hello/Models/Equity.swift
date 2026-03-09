@@ -13,10 +13,7 @@ final class Equity: Model, Content, @unchecked Sendable {
     static let schema = "equities"
 
     @ID(custom: "instrument_id", generatedBy: .user)
-    var id: Int?
-
-    @Parent(key: "instrument_id")
-    var instrument: Instrument
+    var id: UUID?
 
     @OptionalField(key: "isin")
     var isin: String?
@@ -39,7 +36,7 @@ final class Equity: Model, Content, @unchecked Sendable {
     init() {}
 
     init(
-        instrumentID: Int,
+        instrumentID: UUID,
         isin: String? = nil,
         cusip: String? = nil,
         figi: String? = nil,
@@ -48,12 +45,15 @@ final class Equity: Model, Content, @unchecked Sendable {
         sharesOutstanding: Int? = nil
     ) {
         self.id = instrumentID
-        self.$instrument.id = instrumentID
         self.isin = isin
         self.cusip = cusip
         self.figi = figi
         self.sector = sector
         self.industry = industry
         self.sharesOutstanding = sharesOutstanding
+    }
+    
+    var ticker: String? {
+        try? joined(Instrument.self).ticker
     }
 }

@@ -35,7 +35,7 @@ struct OptionEODPriceController: RouteCollection {
     func create(req: Request) async throws -> Response {
         try requireAuth(req)
         struct Input: Content {
-            var instrument_id: Int; var price_date: String
+            var instrument_id: UUID; var price_date: String
             var bid: Double?; var ask: Double?; var last: Double?; var settlement_price: Double?
             var volume: Int?; var open_interest: Int?; var implied_volatility: Double?
             var delta: Double?; var gamma: Double?; var theta: Double?; var vega: Double?; var rho: Double?
@@ -65,7 +65,7 @@ struct OptionEODPriceController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let price = try await OptionEODPrice.find(id, on: req.db) else {
             return flash(req, "Price record not found.", type: "error", to: "/option-eod-prices")
         }
@@ -92,7 +92,7 @@ struct OptionEODPriceController: RouteCollection {
 
     func delete(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let price = try await OptionEODPrice.find(id, on: req.db) else {
             return flash(req, "Price record not found.", type: "error", to: "/option-eod-prices")
         }

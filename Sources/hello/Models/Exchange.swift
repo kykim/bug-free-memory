@@ -12,8 +12,8 @@ import Vapor
 final class Exchange: Model, Content, @unchecked Sendable {
     static let schema = "exchanges"
 
-    @ID(custom: "exchange_id", generatedBy: .database)
-    var id: Int?
+    @ID
+    var id: UUID?
 
     @Field(key: "mic_code")
     var micCode: String
@@ -36,7 +36,7 @@ final class Exchange: Model, Content, @unchecked Sendable {
 
     init() {}
 
-    init(id: Int? = nil, micCode: String, name: String, countryCode: String, timezone: String) {
+    init(id: UUID? = nil, micCode: String, name: String, countryCode: String, timezone: String) {
         self.id = id
         self.micCode = micCode
         self.name = name

@@ -13,7 +13,7 @@ final class Index: Model, Content, @unchecked Sendable {
     static let schema = "indexes"
 
     @ID(custom: "instrument_id", generatedBy: .user)
-    var id: Int?
+    var id: UUID?
 
     @Parent(key: "instrument_id")
     var instrument: Instrument
@@ -30,7 +30,7 @@ final class Index: Model, Content, @unchecked Sendable {
     init() {}
 
     init(
-        instrumentID: Int,
+        instrumentID: UUID,
         indexFamily: String? = nil,
         methodology: String? = nil,
         rebalanceFreq: String? = nil

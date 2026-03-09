@@ -33,7 +33,7 @@ struct IndexController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try requireAuth(req)
-        struct Input: Content { var instrument_id: Int; var index_family: String?; var methodology: String?; var rebalance_freq: String? }
+        struct Input: Content { var instrument_id: UUID; var index_family: String?; var methodology: String?; var rebalance_freq: String? }
         let input = try req.content.decode(Input.self)
         guard try await Index.find(input.instrument_id, on: req.db) == nil else {
             return flash(req, "Index record already exists for that instrument.", type: "error", to: "/indexes")
@@ -50,7 +50,7 @@ struct IndexController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let idx = try await Index.find(id, on: req.db) else {
             return flash(req, "Index not found.", type: "error", to: "/indexes")
         }
@@ -65,7 +65,7 @@ struct IndexController: RouteCollection {
 
     func delete(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let idx = try await Index.find(id, on: req.db) else {
             return flash(req, "Index not found.", type: "error", to: "/indexes")
         }

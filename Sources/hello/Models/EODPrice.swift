@@ -12,8 +12,8 @@ import Vapor
 final class EODPrice: Model, Content, @unchecked Sendable {
     static let schema = "eod_prices"
 
-    @ID(custom: "eod_price_id", generatedBy: .database)
-    var id: Int?
+    @ID
+    var id: UUID?
 
     @Parent(key: "instrument_id")
     var instrument: Instrument
@@ -51,8 +51,8 @@ final class EODPrice: Model, Content, @unchecked Sendable {
     init() {}
 
     init(
-        id: Int? = nil,
-        instrumentID: Int,
+        id: UUID? = nil,
+        instrumentID: UUID,
         priceDate: Date,
         open: Double? = nil,
         high: Double? = nil,

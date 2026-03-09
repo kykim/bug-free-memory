@@ -21,9 +21,9 @@ struct CreateCorporateActions: AsyncMigration {
             .create()
 
         try await database.schema("corporate_actions")
-            .field("action_id", .int, .identifier(auto: true))
-            .field("instrument_id", .int, .required,
-                   .references("instruments", "instrument_id", onDelete: .cascade))
+            .field("id", .uuid, .required, .identifier(auto: false))
+            .field("instrument_id", .uuid, .required,
+                   .references("instruments", "id", onDelete: .cascade))
             .field("action_type", actionTypeEnum, .required)
             .field("ex_date", .date, .required)
             .field("record_date", .date)

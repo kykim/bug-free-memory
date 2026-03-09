@@ -11,7 +11,7 @@ import Fluent
 struct CreateExchanges: AsyncMigration {
     func prepare(on database: any Database) async throws {
         try await database.schema("exchanges")
-            .field("exchange_id", .int, .identifier(auto: true))
+            .field("id", .uuid, .required, .identifier(auto: false))
             .field("mic_code", .string, .required)
             .field("name", .string, .required)
             .field("country_code", .string, .required)

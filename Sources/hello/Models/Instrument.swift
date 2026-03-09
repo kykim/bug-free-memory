@@ -11,8 +11,8 @@ enum InstrumentType: String, Codable {
 final class Instrument: Model, Content, @unchecked Sendable {
     static let schema = "instruments"
 
-    @ID(custom: "instrument_id", generatedBy: .database)
-    var id: Int?
+    @ID
+    var id: UUID?
 
     @Enum(key: "instrument_type")
     var instrumentType: InstrumentType
@@ -37,9 +37,6 @@ final class Instrument: Model, Content, @unchecked Sendable {
 
     // Relations
     @OptionalChild(for: \.$instrument)
-    var equity: Equity?
-
-    @OptionalChild(for: \.$instrument)
     var index: Index?
 
     @OptionalChild(for: \.$instrument)
@@ -57,11 +54,11 @@ final class Instrument: Model, Content, @unchecked Sendable {
     init() {}
 
     init(
-        id: Int? = nil,
+        id: UUID? = nil,
         instrumentType: InstrumentType,
         ticker: String,
         name: String,
-        exchangeID: Int? = nil,
+        exchangeID: UUID? = nil,
         currencyCode: String,
         isActive: Bool = true
     ) {
@@ -75,6 +72,6 @@ final class Instrument: Model, Content, @unchecked Sendable {
     }
 
     // Plain accessors for Leaf templates (which can't use $ property wrapper syntax)
-    var exchangeID: Int?   { $exchange.id }
+    var exchangeID: UUID?   { $exchange.id }
     var currencyCode: String { $currency.id }
 }

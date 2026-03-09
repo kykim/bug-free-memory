@@ -24,7 +24,7 @@ final class OptionContract: Model, Content, @unchecked Sendable {
     static let schema = "option_contracts"
 
     @ID(custom: "instrument_id", generatedBy: .user)
-    var id: Int?
+    var id: UUID?
 
     @Parent(key: "instrument_id")
     var instrument: Instrument
@@ -60,8 +60,8 @@ final class OptionContract: Model, Content, @unchecked Sendable {
     init() {}
 
     init(
-        instrumentID: Int,
-        underlyingID: Int,
+        instrumentID: UUID,
+        underlyingID: UUID,
         optionType: OptionType,
         exerciseStyle: ExerciseStyle,
         strikePrice: Double,

@@ -11,8 +11,8 @@ import Fluent
 struct CreateEquities: AsyncMigration {
     func prepare(on database: any Database) async throws {
         try await database.schema("equities")
-            .field("instrument_id", .int, .identifier(auto: false),
-                   .references("instruments", "instrument_id", onDelete: .cascade))
+            .field("instrument_id", .uuid, .required, .identifier(auto: false),
+                   .references("instruments", "id", onDelete: .cascade))
             .field("isin", .string)
             .field("cusip", .string)
             .field("figi", .string)

@@ -36,7 +36,7 @@ struct OptionContractController: RouteCollection {
     func create(req: Request) async throws -> Response {
         try requireAuth(req)
         struct Input: Content {
-            var instrument_id: Int; var underlying_id: Int
+            var instrument_id: UUID; var underlying_id: UUID
             var option_type: String; var exercise_style: String
             var strike_price: Double; var expiration_date: String
             var contract_multiplier: Double?; var settlement_type: String?; var osi_symbol: String?
@@ -64,7 +64,7 @@ struct OptionContractController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let contract = try await OptionContract.find(id, on: req.db) else {
             return flash(req, "Contract not found.", type: "error", to: "/option-contracts")
         }
@@ -87,7 +87,7 @@ struct OptionContractController: RouteCollection {
 
     func delete(req: Request) async throws -> Response {
         try requireAuth(req)
-        guard let id = req.parameters.get("id", as: Int.self),
+        guard let id = req.parameters.get("id", as: UUID.self),
               let contract = try await OptionContract.find(id, on: req.db) else {
             return flash(req, "Contract not found.", type: "error", to: "/option-contracts")
         }

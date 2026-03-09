@@ -11,8 +11,8 @@ import Fluent
 struct CreateIndexes: AsyncMigration {
     func prepare(on database: any Database) async throws {
         try await database.schema("indexes")
-            .field("instrument_id", .int, .identifier(auto: false),
-                   .references("instruments", "instrument_id", onDelete: .cascade))
+            .field("instrument_id", .uuid, .required, .identifier(auto: false),
+                   .references("instruments", "id", onDelete: .cascade))
             .field("index_family", .string)
             .field("methodology", .string)
             .field("rebalance_freq", .string)

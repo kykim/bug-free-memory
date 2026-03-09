@@ -50,7 +50,7 @@
         #if(equities):
             #for(equity in equities):
             <tr id="row-#(equity.id)">
-                <td class="td-accent">#(equity.instrument.ticker)</td>
+                <td class="td-accent">#(equity.ticker)</td>
                 <td class="td-mono">#(equity.isin)</td>
                 <td class="td-mono">#(equity.cusip)</td>
                 <td class="td-mono">#(equity.figi)</td>
