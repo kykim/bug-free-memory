@@ -1,0 +1,81 @@
+#extend("base"):
+#export("title"):#(ticker) — Equity Detail#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"):active#endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+<div class="page-header">
+    <div class="page-title">#(ticker)<small>#(name)</small></div>
+    <a href="/equities" class="btn btn-ghost">← Equities</a>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Equity details</div>
+    <div class="form-row">
+        <div class="form-group fg-md"><label>ISIN</label><div class="td-mono">#(isin)</div></div>
+        <div class="form-group fg-sm"><label>CUSIP</label><div class="td-mono">#(cusip)</div></div>
+        <div class="form-group fg-md"><label>FIGI</label><div class="td-mono">#(figi)</div></div>
+        <div class="form-group fg-lg"><label>Sector</label><div class="td-muted">#(sector)</div></div>
+        <div class="form-group fg-lg"><label>Industry</label><div class="td-muted">#(industry)</div></div>
+        <div class="form-group fg-md"><label>Shares Outstanding</label><div class="td-muted">#(sharesOutstanding)</div></div>
+    </div>
+</div>
+
+<div class="page-header" style="margin-top:2rem">
+    <div class="page-title" style="font-size:1rem">EOD Prices<small>page #(page)</small></div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+        <div class="row-count"><strong>#count(prices)</strong> records</div>
+        <form method="post" action="/equities/#(id)/fetch-today" style="margin:0">
+            <button type="submit" class="btn btn-ghost">Fetch Today</button>
+        </form>
+        <form method="post" action="/equities/#(id)/backfill" style="margin:0">
+            <button type="submit" class="btn btn-ghost">Backfill 1 Year</button>
+        </form>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Adj Close</th><th>Volume</th><th>VWAP</th><th>Source</th></tr></thead>
+        <tbody>
+        #if(prices):
+            #for(p in prices):
+            <tr>
+                <td class="td-mono">#(p.priceDate)</td>
+                <td class="td-mono">#(p.open)</td>
+                <td class="td-mono">#(p.high)</td>
+                <td class="td-mono">#(p.low)</td>
+                <td class="td-mono">#(p.close)</td>
+                <td class="td-mono">#(p.adjClose)</td>
+                <td class="td-muted">#(p.volume)</td>
+                <td class="td-mono">#(p.vwap)</td>
+                <td class="td-muted">#(p.source)</td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="9"><div class="empty">No EOD price records found for this equity.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    #if(page > 1):
+    <a href="/equities/#(id)?page=#(prevPage)" class="btn btn-ghost">← Newer</a>
+    #endif
+    #if(hasNextPage):
+    <a href="/equities/#(id)?page=#(nextPage)" class="btn btn-ghost">Older →</a>
+    #endif
+</div>
+#endexport
+#endextend

@@ -49,7 +49,7 @@
         <tbody>
         #if(equities):
             #for(equity in equities):
-            <tr id="row-#(equity.id)">
+            <tr id="row-#(equity.id)" class="tr-clickable" onclick="window.location='/equities/#(equity.id)'">
                 <td class="td-accent">#(equity.ticker)</td>
                 <td class="td-mono">#(equity.isin)</td>
                 <td class="td-mono">#(equity.cusip)</td>
@@ -57,8 +57,8 @@
                 <td class="td-muted">#(equity.sector)</td>
                 <td class="td-muted">#(equity.industry)</td>
                 <td class="td-muted">#(equity.sharesOutstanding)</td>
-                <td class="td-actions"><div class="action-group">
-                    <button class="btn btn-ghost" onclick="showEdit(#(equity.id))">Edit</button>
+                <td class="td-actions"><div class="action-group" onclick="event.stopPropagation()">
+                    <button class="btn btn-ghost" onclick="showEdit('#(equity.id)')">Edit</button>
                     <form method="POST" action="/equities/#(equity.id)/delete" onsubmit="return confirm('Delete equity record?')">
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </form>
@@ -75,7 +75,7 @@
                             <input class="edit-input edit-input-lg" type="text" name="industry" value="#(equity.industry)" placeholder="Industry">
                             <input class="edit-input edit-input-md" type="number" name="shares_outstanding" value="#(equity.sharesOutstanding)" placeholder="Shares">
                             <button type="submit" class="btn btn-primary">Save</button>
-                            <button type="button" class="btn btn-ghost" onclick="hideEdit(#(equity.id))">Cancel</button>
+                            <button type="button" class="btn btn-ghost" onclick="hideEdit('#(equity.id)')">Cancel</button>
                         </div>
                     </form>
                 </td>

@@ -52,5 +52,14 @@ struct TemporalWorkerService: LifecycleHandler {
                 application.logger.error("Temporal worker failed: \(error)")
             }
         }
+        
+        Task {
+            do {
+                application.logger.info("Starting Temporal worker startEODPriceWorker...")
+                try await startEODPriceWorker(app: application)
+            } catch {
+                app.logger.critical("EOD price worker failed: \(error)")
+            }
+        }
     }
 }

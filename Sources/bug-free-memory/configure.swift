@@ -23,17 +23,6 @@ extension Application {
 public func configure(_ app: Application) async throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
-    // Register Temporal client
-    app.temporal = try TemporalClient(
-        target: .dns(host: "temporal", port: 7233),
-        transportSecurity: .plaintext,
-        configuration: .init(
-            instrumentation: .init(serverHostname: "temporal")
-        ),
-        logger: app.logger
-    )
-    app.lifecycle.use(TemporalWorkerService(app: app))
-        
     app.tiingo = TiingoClient(apiKey: Environment.get("TIINGO_API_KEY") ?? "")
 
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
@@ -62,6 +51,17 @@ public func configure(_ app: Application) async throws {
     app.useClerkLeaf()               // registers tags + enables Leaf renderer
     app.addClerkLeafSources()        // registers both your app's Views + the bundled Clerk templates
     app.registerClerkRoutes()        // optional: adds /sign-in, /sign-up, /profile routes
+
+    // Register Temporal client
+    app.temporal = try TemporalClient(
+        target: .dns(host: "temporal", port: 7233),
+        transportSecurity: .plaintext,
+        configuration: .init(
+            instrumentation: .init(serverHostname: "temporal")
+        ),
+        logger: app.logger
+    )
+    app.lifecycle.use(TemporalWorkerService(app: app))
 
     // register routes
     try app.register(collection: CurrencyController())

@@ -1,5 +1,7 @@
 import Fluent
+import Foundation
 import Leaf
+import Temporal
 import Vapor
 import ClerkVapor
 
@@ -7,7 +9,10 @@ struct EquityController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
         let g = routes.grouped(ClerkMiddleware()).grouped("equities")
         g.get(use: index); g.post(use: create)
+        g.get(":id", use: show)
         g.post(":id", "edit", use: update); g.post(":id", "delete", use: delete)
+        g.post(":id", "backfill", use: backfill)
+        g.post(":id", "fetch-today", use: fetchToday)
     }
 
     func index(req: Request) async throws -> View {
@@ -53,6 +58,90 @@ struct EquityController: RouteCollection {
             var flashType: String?
         }
         return try await req.clerkView("equities", context: Context(equities: rows, instruments: try await instruments, flash: flash, flashType: flashType))
+    }
+
+    func show(req: Request) async throws -> View {
+        try req.requireDashboardAuth()
+        guard let id = req.parameters.get("id", as: UUID.self),
+              let equity = try await Equity.query(on: req.db)
+                .join(Instrument.self, on: \Instrument.$id == \Equity.$id)
+                .filter(\.$id == id)
+                .first() else {
+            throw Abort(.notFound)
+        }
+        let instrument = try equity.joined(Instrument.self)
+
+        let page = max(1, (req.query["page"] as Int?) ?? 1)
+        let pageSize = 200
+        let prices = try await EODPrice.query(on: req.db)
+            .filter(\.$instrument.$id == id)
+            .sort(\.$priceDate, .descending)
+            .range((page - 1) * pageSize ..< page * pageSize)
+            .all()
+
+        struct PriceRow: Encodable {
+            var priceDate: String
+            var open: Double?
+            var high: Double?
+            var low: Double?
+            var close: Double
+            var adjClose: Double?
+            var volume: Int?
+            var vwap: Double?
+            var source: String?
+        }
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        df.timeZone = TimeZone(identifier: "UTC")
+
+        let priceRows = prices.map { p in
+            PriceRow(
+                priceDate: df.string(from: p.priceDate),
+                open: p.open, high: p.high, low: p.low,
+                close: p.close, adjClose: p.adjClose,
+                volume: p.volume, vwap: p.vwap, source: p.source
+            )
+        }
+
+        let (flash, flashType) = req.popFlash()
+        struct Context: Encodable {
+            var id: String
+            var ticker: String
+            var name: String
+            var isin: String?
+            var cusip: String?
+            var figi: String?
+            var sector: String?
+            var industry: String?
+            var sharesOutstanding: Int?
+            var prices: [PriceRow]
+            var page: Int
+            var prevPage: Int
+            var nextPage: Int
+            var hasNextPage: Bool
+            var flash: String?
+            var flashType: String?
+        }
+
+        return try await req.clerkView("equity-detail", context: Context(
+            id: id.uuidString,
+            ticker: instrument.ticker,
+            name: instrument.name,
+            isin: equity.isin,
+            cusip: equity.cusip,
+            figi: equity.figi,
+            sector: equity.sector,
+            industry: equity.industry,
+            sharesOutstanding: equity.sharesOutstanding,
+            prices: priceRows,
+            page: page,
+            prevPage: page - 1,
+            nextPage: page + 1,
+            hasNextPage: prices.count == pageSize,
+            flash: flash,
+            flashType: flashType
+        ))
     }
 
     func create(req: Request) async throws -> Response {
@@ -107,5 +196,45 @@ struct EquityController: RouteCollection {
         }
         try await equity.delete(on: req.db)
         return req.flash("Equity record deleted.", type: "success", to: "/equities")
+    }
+
+    func backfill(req: Request) async throws -> Response {
+        try req.requireDashboardAuth()
+        guard let id = req.parameters.get("id", as: UUID.self),
+              let equity = try await Equity.query(on: req.db)
+                .join(Instrument.self, on: \Instrument.$id == \Equity.$id)
+                .filter(\.$id == id)
+                .first() else {
+            return req.flash("Equity not found.", type: "error", to: "/equities")
+        }
+        let ticker = try equity.joined(Instrument.self).ticker
+        let startDate = Calendar.current.date(byAdding: .year, value: -1, to: Date())!
+        let input = UpdateEODPricesInput(equityID: id, ticker: ticker, startDate: startDate, endDate: nil)
+        _ = try await req.application.temporal.startWorkflow(
+            type: UpdateEODPricesWorkflow.self,
+            options: .init(id: "backfill-\(id)-\(UUID())", taskQueue: "eod-prices"),
+            input: input
+        )
+        return req.flash("Backfill started for \(ticker).", type: "success", to: "/equities/\(id.uuidString)")
+    }
+
+    func fetchToday(req: Request) async throws -> Response {
+        try req.requireDashboardAuth()
+        guard let id = req.parameters.get("id", as: UUID.self),
+              let equity = try await Equity.query(on: req.db)
+                .join(Instrument.self, on: \Instrument.$id == \Equity.$id)
+                .filter(\.$id == id)
+                .first() else {
+            return req.flash("Equity not found.", type: "error", to: "/equities")
+        }
+        let ticker = try equity.joined(Instrument.self).ticker
+        let today = Calendar.current.startOfDay(for: Date())
+        let input = UpdateEODPricesInput(equityID: id, ticker: ticker, startDate: today, endDate: today)
+        _ = try await req.application.temporal.startWorkflow(
+            type: UpdateEODPricesWorkflow.self,
+            options: .init(id: "fetch-today-\(id)-\(UUID())", taskQueue: "eod-prices"),
+            input: input
+        )
+        return req.flash("Today's EOD price fetch started for \(ticker).", type: "success", to: "/equities/\(id.uuidString)")
     }
 }

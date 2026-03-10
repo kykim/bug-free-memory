@@ -29,10 +29,6 @@ func routes(_ app: Application) throws {
         return result
     }
     
-    app.get("prices", ":ticker") { req async throws -> [Tiingo.EODPrice] in
-        try await req.tiingo.eod(ticker: req.parameters.get("ticker")!)
-    }
-
     
     app.get("dashboard") { req async throws -> View in
         try await req.clerkView("dashboard", context: [

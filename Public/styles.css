@@ -79,6 +79,8 @@ th { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing
 tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--surface); }
+tbody tr.tr-clickable { cursor: pointer; }
+.pagination { display: flex; gap: 12px; margin-top: 20px; }
 td { padding: 12px 16px; vertical-align: middle; }
 .td-mono { font-family: var(--mono); font-size: 12px; }
 .td-accent { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); }
