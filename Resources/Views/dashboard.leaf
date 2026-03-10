@@ -8,79 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-            --bg:        #0a0c0f;
-            --surface:   #111318;
-            --border:    #1e2229;
-            --border-hi: #2e3340;
-            --text:      #e2e6ed;
-            --muted:     #5a6172;
-            --accent:    #00d4aa;
-            --accent-dim:#004d3e;
-            --danger:    #ff4d6a;
-            --danger-dim:#3d0014;
-            --mono:      'IBM Plex Mono', monospace;
-            --sans:      'IBM Plex Sans', sans-serif;
-        }
-        body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
-
-        /* ── Header ── */
-        header { border-bottom: 1px solid var(--border); padding: 0 40px; height: 56px; display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
-        .logo { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); text-decoration: none; }
-        .header-right { display: flex; align-items: center; gap: 16px; }
-        #clerk-user-button-nav { display: flex; align-items: center; }
-        nav { display: flex; gap: 2px; }
-        nav a { font-family: var(--mono); font-size: 11px; color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 4px; letter-spacing: 0.06em; transition: color 0.15s, background 0.15s; }
-        nav a:hover { color: var(--text); background: var(--border); }
-
-        /* ── Layout ── */
-        main { max-width: 860px; margin: 0 auto; padding: 40px 40px 80px; }
-
-        /* ── Page header ── */
-        .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
-        .page-title { font-family: var(--mono); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
-        .page-title small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 4px; }
-
-        /* ── Hero (signed out) ── */
-        .hero { display: flex; flex-direction: column; align-items: flex-start; padding: 80px 0 60px; }
-        .hero-label { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); margin-bottom: 20px; }
-        .hero h1 { font-family: var(--mono); font-size: 36px; font-weight: 600; letter-spacing: -0.03em; color: var(--text); margin-bottom: 12px; }
-        .hero p { font-size: 14px; color: var(--muted); margin-bottom: 32px; }
-        .hero-signin { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #000; background: var(--accent); padding: 10px 24px; border-radius: 4px; text-decoration: none; transition: opacity 0.15s; }
-        .hero-signin:hover { opacity: 0.85; }
-
-        /* ── Buttons ── */
-        .btn { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border: none; border-radius: 4px; padding: 9px 18px; cursor: pointer; transition: opacity 0.15s, transform 0.1s; white-space: nowrap; text-decoration: none; display: inline-block; }
-        .btn:hover { opacity: 0.85; }
-        .btn:active { transform: scale(0.97); }
-        .btn-ghost  { background: transparent; border: 1px solid var(--border-hi); color: var(--muted); }
-        .btn-ghost:hover { border-color: var(--text); color: var(--text); opacity: 1; }
-        .btn-danger { background: var(--danger-dim); border: 1px solid var(--danger); color: var(--danger); }
-
-        /* ── Profile card ── */
-        .profile-card { display: flex; gap: 28px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 28px; margin-bottom: 24px; }
-        .profile-avatar { flex-shrink: 0; }
-        .profile-avatar img, .avatar-initials { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
-        .avatar-initials { display: flex; align-items: center; justify-content: center; background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); font-family: var(--mono); font-size: 22px; font-weight: 600; }
-        .profile-info { flex: 1; min-width: 0; }
-        .profile-name { font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-        .profile-email { font-size: 13px; color: var(--muted); margin-bottom: 2px; }
-        .profile-username { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 20px; }
-        .profile-meta { display: flex; flex-wrap: wrap; gap: 24px; }
-        .meta-item { display: flex; flex-direction: column; gap: 4px; }
-        .meta-label { font-family: var(--mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
-        .meta-item code { font-family: var(--mono); font-size: 12px; color: var(--accent); background: var(--accent-dim); padding: 2px 8px; border-radius: 3px; }
-        .meta-item span:not(.meta-label) { font-family: var(--mono); font-size: 12px; color: var(--text); }
-
-        /* ── Dashboard content ── */
-        .dashboard-content { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 24px; }
-        .panel-label { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-        .content-hint { font-size: 13px; color: var(--muted); }
-
-        @media (max-width: 480px) { .profile-card { flex-direction: column; } }
-    </style>
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
     <!-- Hide auth sections before Clerk loads to avoid flash -->
@@ -113,7 +41,7 @@
         </div>
     </header>
 
-    <main>
+    <main class="dashboard-layout">
         <div class="dashboard">
 
             <!-- Signed out state -->

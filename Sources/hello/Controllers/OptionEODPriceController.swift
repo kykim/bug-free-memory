@@ -10,19 +10,14 @@ struct OptionEODPriceController: RouteCollection {
         g.post(":id", "edit", use: update); g.post(":id", "delete", use: delete)
     }
 
-    private func requireAuth(_ req: Request) throws {
-        guard req.clerkAuth.isAuthenticated else { throw Abort.redirect(to: "/dashboard") }
-    }
-
     func index(req: Request) async throws -> View {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         async let prices      = OptionEODPrice.query(on: req.db).with(\.$instrument)
             .sort(\.$priceDate, .descending).limit(200).all()
         async let instruments = Instrument.query(on: req.db)
             .filter(.sql(unsafeRaw: "\"instrument_type\" IN ('equity_option'::instrument_type, 'index_option'::instrument_type)"))
             .sort(\.$ticker).all()
-        let flash = req.session.data["flash"]; req.session.data["flash"] = nil
-        let flashType = req.session.data["flashType"]; req.session.data["flashType"] = nil
+        let (flash, flashType) = req.popFlash()
         struct Context: Encodable {
             var prices: [OptionEODPrice]
             var instruments: [Instrument]
@@ -33,7 +28,7 @@ struct OptionEODPriceController: RouteCollection {
     }
 
     func create(req: Request) async throws -> Response {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         struct Input: Content {
             var instrument_id: UUID; var price_date: String
             var bid: Double?; var ask: Double?; var last: Double?; var settlement_price: Double?
@@ -45,7 +40,7 @@ struct OptionEODPriceController: RouteCollection {
         let input = try req.content.decode(Input.self)
         let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
         guard let date = fmt.date(from: input.price_date) else {
-            return flash(req, "Invalid date format.", type: "error", to: "/option-eod-prices")
+            return req.flash("Invalid date format.", type: "error", to: "/option-eod-prices")
         }
         let price = OptionEODPrice(
             instrumentID: input.instrument_id, priceDate: date,
@@ -57,17 +52,17 @@ struct OptionEODPriceController: RouteCollection {
             vega: input.vega, rho: input.rho,
             underlyingPrice: input.underlying_price,
             riskFreeRate: input.risk_free_rate, dividendYield: input.dividend_yield,
-            source: input.source?.isEmpty == false ? input.source : nil
+            source: input.source.ifNotEmpty
         )
         try await price.save(on: req.db)
-        return flash(req, "Option EOD price record created.", type: "success", to: "/option-eod-prices")
+        return req.flash("Option EOD price record created.", type: "success", to: "/option-eod-prices")
     }
 
     func update(req: Request) async throws -> Response {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         guard let id = req.parameters.get("id", as: UUID.self),
               let price = try await OptionEODPrice.find(id, on: req.db) else {
-            return flash(req, "Price record not found.", type: "error", to: "/option-eod-prices")
+            return req.flash("Price record not found.", type: "error", to: "/option-eod-prices")
         }
         struct Input: Content {
             var bid: Double?; var ask: Double?; var last: Double?; var settlement_price: Double?
@@ -85,23 +80,18 @@ struct OptionEODPriceController: RouteCollection {
         price.theta = input.theta; price.vega = input.vega; price.rho = input.rho
         price.underlyingPrice = input.underlying_price
         price.riskFreeRate = input.risk_free_rate; price.dividendYield = input.dividend_yield
-        price.source = input.source?.isEmpty == false ? input.source : nil
+        price.source = input.source.ifNotEmpty
         try await price.save(on: req.db)
-        return flash(req, "Option EOD price record updated.", type: "success", to: "/option-eod-prices")
+        return req.flash("Option EOD price record updated.", type: "success", to: "/option-eod-prices")
     }
 
     func delete(req: Request) async throws -> Response {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         guard let id = req.parameters.get("id", as: UUID.self),
               let price = try await OptionEODPrice.find(id, on: req.db) else {
-            return flash(req, "Price record not found.", type: "error", to: "/option-eod-prices")
+            return req.flash("Price record not found.", type: "error", to: "/option-eod-prices")
         }
         try await price.delete(on: req.db)
-        return flash(req, "Option EOD price record deleted.", type: "success", to: "/option-eod-prices")
-    }
-
-    private func flash(_ req: Request, _ msg: String, type: String, to path: String) -> Response {
-        req.session.data["flash"] = msg; req.session.data["flashType"] = type
-        return req.redirect(to: path)
+        return req.flash("Option EOD price record deleted.", type: "success", to: "/option-eod-prices")
     }
 }

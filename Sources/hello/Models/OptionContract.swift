@@ -53,10 +53,6 @@ final class OptionContract: Model, Content, @unchecked Sendable {
     @OptionalField(key: "osi_symbol")
     var osiSymbol: String?
 
-    // Relations
-//    @Children(for: \.$instrument)
-//    var eodPrices: [OptionEODPrice]
-
     init() {}
 
     init(

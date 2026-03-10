@@ -10,20 +10,15 @@ struct OptionContractController: RouteCollection {
         g.post(":id", "edit", use: update); g.post(":id", "delete", use: delete)
     }
 
-    private func requireAuth(_ req: Request) throws {
-        guard req.clerkAuth.isAuthenticated else { throw Abort.redirect(to: "/dashboard") }
-    }
-
     func index(req: Request) async throws -> View {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         async let contracts   = OptionContract.query(on: req.db)
             .with(\.$instrument).with(\.$underlying)
             .sort(\.$expirationDate).all()
         async let underlyings = Instrument.query(on: req.db)
             .filter(.sql(unsafeRaw: "\"instrument_type\" IN ('equity'::instrument_type, 'index'::instrument_type)"))
             .sort(\.$ticker).all()
-        let flash = req.session.data["flash"]; req.session.data["flash"] = nil
-        let flashType = req.session.data["flashType"]; req.session.data["flashType"] = nil
+        let (flash, flashType) = req.popFlash()
         struct Context: Encodable {
             var contracts: [OptionContract]
             var underlyings: [Instrument]
@@ -34,7 +29,7 @@ struct OptionContractController: RouteCollection {
     }
 
     func create(req: Request) async throws -> Response {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         struct Input: Content {
             var instrument_id: UUID; var underlying_id: UUID
             var option_type: String; var exercise_style: String
@@ -44,11 +39,11 @@ struct OptionContractController: RouteCollection {
         let input = try req.content.decode(Input.self)
         guard let optType = OptionType(rawValue: input.option_type),
               let exStyle = ExerciseStyle(rawValue: input.exercise_style) else {
-            return flash(req, "Invalid option type or exercise style.", type: "error", to: "/option-contracts")
+            return req.flash("Invalid option type or exercise style.", type: "error", to: "/option-contracts")
         }
         let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
         guard let expDate = fmt.date(from: input.expiration_date) else {
-            return flash(req, "Invalid expiration date format.", type: "error", to: "/option-contracts")
+            return req.flash("Invalid expiration date format.", type: "error", to: "/option-contracts")
         }
         let contract = OptionContract(
             instrumentID: input.instrument_id, underlyingID: input.underlying_id,
@@ -56,17 +51,17 @@ struct OptionContractController: RouteCollection {
             strikePrice: input.strike_price, expirationDate: expDate,
             contractMultiplier: input.contract_multiplier ?? 100,
             settlementType: input.settlement_type ?? "physical",
-            osiSymbol: input.osi_symbol?.isEmpty == false ? input.osi_symbol : nil
+            osiSymbol: input.osi_symbol.ifNotEmpty
         )
         try await contract.save(on: req.db)
-        return flash(req, "Option contract created.", type: "success", to: "/option-contracts")
+        return req.flash("Option contract created.", type: "success", to: "/option-contracts")
     }
 
     func update(req: Request) async throws -> Response {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         guard let id = req.parameters.get("id", as: UUID.self),
               let contract = try await OptionContract.find(id, on: req.db) else {
-            return flash(req, "Contract not found.", type: "error", to: "/option-contracts")
+            return req.flash("Contract not found.", type: "error", to: "/option-contracts")
         }
         struct Input: Content {
             var strike_price: Double; var expiration_date: String
@@ -75,28 +70,23 @@ struct OptionContractController: RouteCollection {
         let input = try req.content.decode(Input.self)
         let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
         guard let expDate = fmt.date(from: input.expiration_date) else {
-            return flash(req, "Invalid expiration date format.", type: "error", to: "/option-contracts")
+            return req.flash("Invalid expiration date format.", type: "error", to: "/option-contracts")
         }
         contract.strikePrice = input.strike_price; contract.expirationDate = expDate
         contract.contractMultiplier = input.contract_multiplier
         contract.settlementType = input.settlement_type
-        contract.osiSymbol = input.osi_symbol?.isEmpty == false ? input.osi_symbol : nil
+        contract.osiSymbol = input.osi_symbol.ifNotEmpty
         try await contract.save(on: req.db)
-        return flash(req, "Contract updated.", type: "success", to: "/option-contracts")
+        return req.flash("Contract updated.", type: "success", to: "/option-contracts")
     }
 
     func delete(req: Request) async throws -> Response {
-        try requireAuth(req)
+        try req.requireDashboardAuth()
         guard let id = req.parameters.get("id", as: UUID.self),
               let contract = try await OptionContract.find(id, on: req.db) else {
-            return flash(req, "Contract not found.", type: "error", to: "/option-contracts")
+            return req.flash("Contract not found.", type: "error", to: "/option-contracts")
         }
         try await contract.delete(on: req.db)
-        return flash(req, "Contract deleted.", type: "success", to: "/option-contracts")
-    }
-
-    private func flash(_ req: Request, _ msg: String, type: String, to path: String) -> Response {
-        req.session.data["flash"] = msg; req.session.data["flashType"] = type
-        return req.redirect(to: path)
+        return req.flash("Contract deleted.", type: "success", to: "/option-contracts")
     }
 }

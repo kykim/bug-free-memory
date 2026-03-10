@@ -3,14 +3,39 @@ import Vapor
 import Fluent
 import FluentPostgresDriver
 import Leaf
+import Temporal
 import ClerkVapor
 import ClerkLeaf
+import TiingoKit
+
+// Extend Application to store the Temporal client
+extension Application {
+    struct TemporalKey: StorageKey {
+        typealias Value = TemporalClient
+    }
+    var temporal: TemporalClient {
+        get { storage[TemporalKey.self]! }
+        set { storage[TemporalKey.self] = newValue }
+    }
+}
 
 // configures your application
 public func configure(_ app: Application) async throws {
-    // uncomment to serve files from /Public folder
-    // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
+    app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
+    // Register Temporal client
+    app.temporal = try TemporalClient(
+        target: .dns(host: "temporal", port: 7233),
+        transportSecurity: .plaintext,
+        configuration: .init(
+            instrumentation: .init(serverHostname: "temporal")
+        ),
+        logger: app.logger
+    )
+    app.lifecycle.use(TemporalWorkerService(app: app))
+        
+    app.tiingo = TiingoClient(apiKey: Environment.get("TIINGO_API_KEY") ?? "")
+
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
     try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
 

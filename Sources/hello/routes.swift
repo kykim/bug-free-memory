@@ -1,5 +1,6 @@
 import Vapor
 import ClerkVapor
+import TiingoKit
 
 func routes(_ app: Application) throws {
     app.get { req async in
@@ -7,7 +8,31 @@ func routes(_ app: Application) throws {
     }
 
     app.get("hello") { req async throws -> View in
-        return try await req.view.render("hello", ["name": "Leaf"])    }
+        return try await req.view.render("hello", ["name": "Leaf"])
+    }
+    
+    app.get("greet", ":name") { req async throws -> String in
+        let name = try req.parameters.require("name")
+        req.logger.info("Triggering workflow for \(name)")
+        req.logger.info("About to call startWorkflow")
+        let handle = try await req.application.temporal.startWorkflow(
+            type: GreetingWorkflow.self,
+            options: .init(
+                id: "greet-\(name)-\(UUID())",
+                taskQueue: "greeting-queue"
+            ),
+            input: name
+        )
+        req.logger.info("startWorkflow returned, calling result()")
+        let result: String = try await handle.result()
+        req.logger.info("result() returned")
+        return result
+    }
+    
+    app.get("prices", ":ticker") { req async throws -> [Tiingo.EODPrice] in
+        try await req.tiingo.eod(ticker: req.parameters.get("ticker")!)
+    }
+
     
     app.get("dashboard") { req async throws -> View in
         try await req.clerkView("dashboard", context: [
