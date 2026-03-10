@@ -20,7 +20,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "hello",
+            name: "bug-free-memory",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "NIOCore", package: "swift-nio"),
@@ -36,9 +36,9 @@ let package = Package(
             swiftSettings: swiftSettings
         ),
         .testTarget(
-            name: "helloTests",
+            name: "bug-free-memoryTests",
             dependencies: [
-                .target(name: "hello"),
+                .target(name: "bug-free-memory"),
                 .product(name: "VaporTesting", package: "vapor"),
             ],
             swiftSettings: swiftSettings

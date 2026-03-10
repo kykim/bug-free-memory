@@ -1,9 +1,9 @@
-@testable import hello
+@testable import bug_free_memory
 import VaporTesting
 import Testing
 
 @Suite("App Tests")
-struct helloTests {
+struct bug_free_memoryTests {
     @Test("Test Hello World Route")
     func helloWorld() async throws {
         try await withApp(configure: configure) { app in

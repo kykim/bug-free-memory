@@ -22,7 +22,7 @@ x-shared_environment: &shared_environment
   
 services:
   app:
-    image: hello:latest
+    image: bug-free-memory:latest
     build:
       context: .
     environment:
