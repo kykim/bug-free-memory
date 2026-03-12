@@ -41,12 +41,35 @@ public struct PriceOptionContractActivities {
         return 1
     }
 
+    /// Runs the full Monte Carlo simulation and stores the price. Greeks are not computed
+    /// here — use `computeMonteCarloGreeks` as a separate deferred step.
     @Activity
-    public func priceMonteCarlo(input: PriceOptionContractInput) async throws -> Int {
+    public func priceMonteCarloPriceOnly(input: PriceOptionContractInput) async throws -> Int {
         let (contract, latest, eodHistory, priceDate, riskFreeRate) = try await fetchPricingInputs(contractID: input.contractID)
-        guard let result = contract.monteCarloPrice(currentPrice: latest, priceHistory: eodHistory, riskFreeRate: riskFreeRate, lookback: 30, simulations: 100_000, stepsPerPath: 252) else { return 0 }
+        guard let result = contract.monteCarloPrice(currentPrice: latest, priceHistory: eodHistory, riskFreeRate: riskFreeRate, lookback: 30, simulations: 100_000, stepsPerPath: 252, computeGreeks: false) else { return 0 }
         let record = TheoreticalOptionEODPrice.from(result: result, instrumentID: input.contractID, priceDate: priceDate, riskFreeRate: riskFreeRate, source: "calculated")
         try await upsert(record, contractID: input.contractID, priceDate: priceDate, model: .monteCarlo)
+        return 1
+    }
+
+    /// Runs the Monte Carlo simulation with all Greeks (7–8 bump-and-reprice runs at n/4
+    /// simulations each) and updates the Greeks on the existing price record in-place.
+    /// Intended to be called from `ComputeMonteCarloGreeksWorkflow` as a deferred step.
+    @Activity
+    public func computeMonteCarloGreeks(input: PriceOptionContractInput) async throws -> Int {
+        let (contract, latest, eodHistory, priceDate, riskFreeRate) = try await fetchPricingInputs(contractID: input.contractID)
+        guard let result = contract.monteCarloPrice(currentPrice: latest, priceHistory: eodHistory, riskFreeRate: riskFreeRate, lookback: 30, simulations: 100_000, stepsPerPath: 252, computeGreeks: true) else { return 0 }
+        guard let existing = try await TheoreticalOptionEODPrice.query(on: db)
+            .filter(\.$instrument.$id == input.contractID)
+            .filter(\.$priceDate == priceDate)
+            .filter(\.$model == .monteCarlo)
+            .first() else { return 0 }
+        existing.delta = result.greeks?.delta
+        existing.gamma = result.greeks?.gamma
+        existing.theta = result.greeks?.theta
+        existing.vega  = result.greeks?.vega
+        existing.rho   = result.greeks?.rho
+        try await existing.save(on: db)
         return 1
     }
 

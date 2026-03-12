@@ -24,11 +24,8 @@ struct CurrencyController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content { var currency_code: String; var name: String }
-        let input = try req.content.decode(Input.self)
-        guard input.currency_code.count == 3 else {
-            return req.flash("Currency code must be exactly 3 characters.", type: "error", to: "/currencies")
-        }
+        if let r = try req.validateContent(CreateCurrencyDTO.self, redirectTo: "/currencies") { return r }
+        let input = try req.content.decode(CreateCurrencyDTO.self)
         let code = input.currency_code.uppercased()
         if try await Currency.find(code, on: req.db) != nil {
             return req.flash("\(code) already exists.", type: "error", to: "/currencies")
@@ -39,9 +36,9 @@ struct CurrencyController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        guard let code = req.parameters.get("code") else { throw Abort(.badRequest) }
-        struct Input: Content { var name: String }
-        let input = try req.content.decode(Input.self)
+        guard let code = req.parameters.get("code") else { throw AppError.missingRouteParameter("code") }
+        if let r = try req.validateContent(UpdateCurrencyDTO.self, redirectTo: "/currencies") { return r }
+        let input = try req.content.decode(UpdateCurrencyDTO.self)
         guard let currency = try await Currency.find(code, on: req.db) else {
             return req.flash("\(code) not found.", type: "error", to: "/currencies")
         }
@@ -52,7 +49,7 @@ struct CurrencyController: RouteCollection {
 
     func delete(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        guard let code = req.parameters.get("code") else { throw Abort(.badRequest) }
+        guard let code = req.parameters.get("code") else { throw AppError.missingRouteParameter("code") }
         guard let currency = try await Currency.find(code, on: req.db) else {
             return req.flash("\(code) not found.", type: "error", to: "/currencies")
         }

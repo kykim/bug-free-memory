@@ -340,10 +340,10 @@ extension OptionContract {
             let body = try req.content.decode(PricingRequest.self)
 
             guard let optionID = req.parameters.get("optionID", as: UUID.self) else {
-                throw Abort(.badRequest, reason: "Invalid option ID")
+                throw AppError.invalidRouteParameter("optionID")
             }
             guard let contract = try await OptionContract.find(optionID, on: req.db) else {
-                throw Abort(.notFound, reason: "Option contract not found")
+                throw AppError.contractNotFound
             }
 
             let history = try await EODPrice.query(on: req.db)
@@ -353,7 +353,7 @@ extension OptionContract {
                 .all()
 
             guard let latest = history.first else {
-                throw Abort(.notFound, reason: "No price data found for underlying")
+                throw AppError.noUnderlyingPriceData
             }
             guard let (bs, bin) = contract.price(
                 currentPrice: latest,
@@ -363,7 +363,7 @@ extension OptionContract {
                 steps: body.steps,
                 marketPrice: body.marketPrice
             ) else {
-                throw Abort(.unprocessableEntity, reason: "Pricing failed — check inputs or price history")
+                throw AppError.pricingFailed
             }
 
             return PricingResponse(blackScholes: bs, binomial: bin)

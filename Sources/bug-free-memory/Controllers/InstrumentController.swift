@@ -28,17 +28,14 @@ struct InstrumentController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content {
-            var instrument_type: String; var ticker: String; var name: String
-            var exchange_id: UUID?; var currency_code: String; var is_active: String?
-        }
-        let input = try req.content.decode(Input.self)
-        guard let type = InstrumentType(rawValue: input.instrument_type) else {
-            return req.flash("Invalid instrument type.", type: "error", to: "/instruments")
-        }
+        if let r = try req.validateContent(CreateInstrumentDTO.self, redirectTo: "/instruments") { return r }
+        let input = try req.content.decode(CreateInstrumentDTO.self)
         let instrument = Instrument(
-            instrumentType: type, ticker: input.ticker.uppercased(), name: input.name,
-            exchangeID: input.exchange_id, currencyCode: input.currency_code,
+            instrumentType: input.parsedInstrumentType,
+            ticker: input.ticker.uppercased(),
+            name: input.name,
+            exchangeID: input.exchange_id,
+            currencyCode: input.currency_code,
             isActive: input.is_active == "on"
         )
         try await instrument.save(on: req.db)
@@ -51,8 +48,8 @@ struct InstrumentController: RouteCollection {
               let instrument = try await Instrument.find(id, on: req.db) else {
             return req.flash("Instrument not found.", type: "error", to: "/instruments")
         }
-        struct Input: Content { var name: String; var exchange_id: UUID?; var currency_code: String; var is_active: String? }
-        let input = try req.content.decode(Input.self)
+        if let r = try req.validateContent(UpdateInstrumentDTO.self, redirectTo: "/instruments") { return r }
+        let input = try req.content.decode(UpdateInstrumentDTO.self)
         instrument.name = input.name
         instrument.$exchange.id = input.exchange_id
         instrument.$currency.id = input.currency_code

@@ -1,6 +1,5 @@
 import Fluent
 import Leaf
-import Temporal
 import Vapor
 import ClerkVapor
 
@@ -13,14 +12,7 @@ struct FREDYieldController: RouteCollection {
 
     func update(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        _ = try await req.application.temporal.startWorkflow(
-            type: UpdateFREDYieldsWorkflow.self,
-            options: .init(
-                id: "update-fred-yields-\(UUID())",
-                taskQueue: "fred-yields"
-            ),
-            input: UpdateFREDYieldsInput()
-        )
+        try await req.fredYieldService.triggerUpdate()
         return req.flash("FRED yield update started.", type: "success", to: "/fred-yields")
     }
 

@@ -27,15 +27,11 @@ struct EODPriceController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content {
-            var instrument_id: UUID; var price_date: String
-            var open: Double?; var high: Double?; var low: Double?; var close: Double
-            var adj_close: Double?; var volume: Int?; var vwap: Double?; var source: String?
-        }
-        let input = try req.content.decode(Input.self)
-        let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
-        guard let date = fmt.date(from: input.price_date) else {
-            return req.flash("Invalid date format.", type: "error", to: "/eod-prices")
+        if let r = try req.validateContent(CreateEODPriceDTO.self, redirectTo: "/eod-prices") { return r }
+        let input = try req.content.decode(CreateEODPriceDTO.self)
+        let date: Date
+        do { date = try input.parsedPriceDate() } catch let error as AbortError {
+            return req.flash(error.reason, type: "error", to: "/eod-prices")
         }
         let price = EODPrice(
             instrumentID: input.instrument_id, priceDate: date,
@@ -53,11 +49,8 @@ struct EODPriceController: RouteCollection {
               let price = try await EODPrice.find(id, on: req.db) else {
             return req.flash("Price record not found.", type: "error", to: "/eod-prices")
         }
-        struct Input: Content {
-            var open: Double?; var high: Double?; var low: Double?; var close: Double
-            var adj_close: Double?; var volume: Int?; var vwap: Double?; var source: String?
-        }
-        let input = try req.content.decode(Input.self)
+        if let r = try req.validateContent(UpdateEODPriceDTO.self, redirectTo: "/eod-prices") { return r }
+        let input = try req.content.decode(UpdateEODPriceDTO.self)
         price.open = input.open; price.high = input.high; price.low = input.low
         price.close = input.close; price.adjClose = input.adj_close
         price.volume = input.volume; price.vwap = input.vwap

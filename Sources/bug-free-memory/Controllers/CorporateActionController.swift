@@ -29,22 +29,18 @@ struct CorporateActionController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content {
-            var instrument_id: UUID; var action_type: String; var ex_date: String
-            var record_date: String?; var pay_date: String?; var ratio: Double?; var notes: String?
-        }
-        let input = try req.content.decode(Input.self)
-        guard let actionType = CorporateActionType(rawValue: input.action_type) else {
-            return req.flash("Invalid action type.", type: "error", to: "/corporate-actions")
-        }
-        let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
-        guard let exDate = fmt.date(from: input.ex_date) else {
-            return req.flash("Invalid ex-date format.", type: "error", to: "/corporate-actions")
+        if let r = try req.validateContent(CreateCorporateActionDTO.self, redirectTo: "/corporate-actions") { return r }
+        let input = try req.content.decode(CreateCorporateActionDTO.self)
+        let exDate: Date
+        do { exDate = try input.parsedExDate() } catch let error as AbortError {
+            return req.flash(error.reason, type: "error", to: "/corporate-actions")
         }
         let action = CorporateAction(
-            instrumentID: input.instrument_id, actionType: actionType, exDate: exDate,
-            recordDate: input.record_date.flatMap { fmt.date(from: $0) },
-            payDate:    input.pay_date.flatMap    { fmt.date(from: $0) },
+            instrumentID: input.instrument_id,
+            actionType: input.parsedActionType,
+            exDate: exDate,
+            recordDate: try input.parsedRecordDate(),
+            payDate: try input.parsedPayDate(),
             ratio: input.ratio,
             notes: input.notes.ifNotEmpty
         )
@@ -58,18 +54,15 @@ struct CorporateActionController: RouteCollection {
               let action = try await CorporateAction.find(id, on: req.db) else {
             return req.flash("Corporate action not found.", type: "error", to: "/corporate-actions")
         }
-        struct Input: Content {
-            var ex_date: String; var record_date: String?; var pay_date: String?
-            var ratio: Double?; var notes: String?
-        }
-        let input = try req.content.decode(Input.self)
-        let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
-        guard let exDate = fmt.date(from: input.ex_date) else {
-            return req.flash("Invalid ex-date format.", type: "error", to: "/corporate-actions")
+        if let r = try req.validateContent(UpdateCorporateActionDTO.self, redirectTo: "/corporate-actions") { return r }
+        let input = try req.content.decode(UpdateCorporateActionDTO.self)
+        let exDate: Date
+        do { exDate = try input.parsedExDate() } catch let error as AbortError {
+            return req.flash(error.reason, type: "error", to: "/corporate-actions")
         }
         action.exDate     = exDate
-        action.recordDate = input.record_date.flatMap { fmt.date(from: $0) }
-        action.payDate    = input.pay_date.flatMap    { fmt.date(from: $0) }
+        action.recordDate = try input.parsedRecordDate()
+        action.payDate    = try input.parsedPayDate()
         action.ratio      = input.ratio
         action.notes      = input.notes.ifNotEmpty
         try await action.save(on: req.db)

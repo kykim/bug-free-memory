@@ -28,8 +28,7 @@ struct IndexController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content { var instrument_id: UUID; var index_family: String?; var methodology: String?; var rebalance_freq: String? }
-        let input = try req.content.decode(Input.self)
+        let input = try req.content.decode(CreateIndexDTO.self)
         guard try await Index.find(input.instrument_id, on: req.db) == nil else {
             return req.flash("Index record already exists for that instrument.", type: "error", to: "/indexes")
         }
@@ -49,8 +48,7 @@ struct IndexController: RouteCollection {
               let idx = try await Index.find(id, on: req.db) else {
             return req.flash("Index not found.", type: "error", to: "/indexes")
         }
-        struct Input: Content { var index_family: String?; var methodology: String?; var rebalance_freq: String? }
-        let input = try req.content.decode(Input.self)
+        let input = try req.content.decode(UpdateIndexDTO.self)
         idx.indexFamily   = input.index_family.ifNotEmpty
         idx.methodology   = input.methodology.ifNotEmpty
         idx.rebalanceFreq = input.rebalance_freq.ifNotEmpty

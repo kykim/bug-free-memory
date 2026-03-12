@@ -1,7 +1,6 @@
 import Fluent
 import Foundation
 import Leaf
-import Temporal
 import Vapor
 import ClerkVapor
 
@@ -11,6 +10,7 @@ struct OptionContractController: RouteCollection {
         g.get(use: index); g.post(use: create)
         g.get(":id", use: show)
         g.post(":id", "calculate-price", use: calculatePrice)
+        g.post(":id", "compute-mc-greeks", use: computeMCGreeks)
         g.post(":id", "edit", use: update); g.post(":id", "delete", use: delete)
     }
 
@@ -90,7 +90,6 @@ struct OptionContractController: RouteCollection {
             )
         }
 
-        // Load saved theoretical prices
         struct TheoreticalPriceRow: Encodable {
             var model: String
             var priceDate: String
@@ -176,38 +175,37 @@ struct OptionContractController: RouteCollection {
         guard try await OptionContract.find(id, on: req.db) != nil else {
             return req.flash("Contract not found.", type: "error", to: "/option-contracts")
         }
-        _ = try await req.application.temporal.startWorkflow(
-            type: PriceOptionContractWorkflow.self,
-            options: .init(
-                id: "price-option-\(id)-\(UUID())",
-                taskQueue: "option-pricing"
-            ),
-            input: PriceOptionContractInput(contractID: id)
-        )
+        try await req.optionPricingService.triggerPricing(for: id)
         return req.flash("Pricing calculation started.", type: "success", to: "/option-contracts/\(id)")
+    }
+
+    func computeMCGreeks(req: Request) async throws -> Response {
+        try req.requireDashboardAuth()
+        guard let id = req.parameters.get("id", as: UUID.self) else {
+            return req.flash("Invalid contract ID.", type: "error", to: "/option-contracts")
+        }
+        guard try await OptionContract.find(id, on: req.db) != nil else {
+            return req.flash("Contract not found.", type: "error", to: "/option-contracts")
+        }
+        try await req.optionPricingService.triggerGreeksComputation(for: id)
+        return req.flash("Monte Carlo Greeks computation started.", type: "success", to: "/option-contracts/\(id)")
     }
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content {
-            var instrument_id: UUID; var underlying_id: UUID
-            var option_type: String; var exercise_style: String
-            var strike_price: Double; var expiration_date: String
-            var contract_multiplier: Double?; var settlement_type: String?; var osi_symbol: String?
-        }
-        let input = try req.content.decode(Input.self)
-        guard let optType = OptionType(rawValue: input.option_type),
-              let exStyle = ExerciseStyle(rawValue: input.exercise_style) else {
-            return req.flash("Invalid option type or exercise style.", type: "error", to: "/option-contracts")
-        }
-        let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
-        guard let expDate = fmt.date(from: input.expiration_date) else {
-            return req.flash("Invalid expiration date format.", type: "error", to: "/option-contracts")
+        if let r = try req.validateContent(CreateOptionContractDTO.self, redirectTo: "/option-contracts") { return r }
+        let input = try req.content.decode(CreateOptionContractDTO.self)
+        let expDate: Date
+        do { expDate = try input.parsedExpirationDate() } catch let error as AbortError {
+            return req.flash(error.reason, type: "error", to: "/option-contracts")
         }
         let contract = OptionContract(
-            instrumentID: input.instrument_id, underlyingID: input.underlying_id,
-            optionType: optType, exerciseStyle: exStyle,
-            strikePrice: input.strike_price, expirationDate: expDate,
+            instrumentID: input.instrument_id,
+            underlyingID: input.underlying_id,
+            optionType: input.parsedOptionType,
+            exerciseStyle: input.parsedExerciseStyle,
+            strikePrice: input.strike_price,
+            expirationDate: expDate,
             contractMultiplier: input.contract_multiplier ?? 100,
             settlementType: input.settlement_type ?? "physical",
             osiSymbol: input.osi_symbol.ifNotEmpty
@@ -222,16 +220,14 @@ struct OptionContractController: RouteCollection {
               let contract = try await OptionContract.find(id, on: req.db) else {
             return req.flash("Contract not found.", type: "error", to: "/option-contracts")
         }
-        struct Input: Content {
-            var strike_price: Double; var expiration_date: String
-            var contract_multiplier: Double; var settlement_type: String; var osi_symbol: String?
+        if let r = try req.validateContent(UpdateOptionContractDTO.self, redirectTo: "/option-contracts/\(id)") { return r }
+        let input = try req.content.decode(UpdateOptionContractDTO.self)
+        let expDate: Date
+        do { expDate = try input.parsedExpirationDate() } catch let error as AbortError {
+            return req.flash(error.reason, type: "error", to: "/option-contracts/\(id)")
         }
-        let input = try req.content.decode(Input.self)
-        let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
-        guard let expDate = fmt.date(from: input.expiration_date) else {
-            return req.flash("Invalid expiration date format.", type: "error", to: "/option-contracts")
-        }
-        contract.strikePrice = input.strike_price; contract.expirationDate = expDate
+        contract.strikePrice = input.strike_price
+        contract.expirationDate = expDate
         contract.contractMultiplier = input.contract_multiplier
         contract.settlementType = input.settlement_type
         contract.osiSymbol = input.osi_symbol.ifNotEmpty

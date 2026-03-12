@@ -17,6 +17,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-temporal-sdk.git", .upToNextMinor(from: "0.6.0")),
         .package(url: "https://github.com/kykim/clerk-vapor.git", from: "0.0.6"),
         .package(url: "https://github.com/kykim/tiingo-kit.git", from: "0.0.2"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -31,7 +32,8 @@ let package = Package(
                 .product(name: "Temporal", package: "swift-temporal-sdk"),
                 .product(name: "ClerkVapor", package: "clerk-vapor"),
                 .product(name: "ClerkLeaf", package: "clerk-vapor"),
-                .product(name: "TiingoKit", package: "tiingo-kit")
+                .product(name: "TiingoKit", package: "tiingo-kit"),
+                .product(name: "Crypto", package: "swift-crypto")
             ],
             swiftSettings: swiftSettings
         ),

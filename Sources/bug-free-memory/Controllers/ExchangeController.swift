@@ -24,10 +24,14 @@ struct ExchangeController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content { var mic_code: String; var name: String; var country_code: String; var timezone: String }
-        let input = try req.content.decode(Input.self)
-        let exchange = Exchange(micCode: input.mic_code.uppercased(), name: input.name,
-                                countryCode: input.country_code.uppercased(), timezone: input.timezone)
+        if let r = try req.validateContent(CreateExchangeDTO.self, redirectTo: "/exchanges") { return r }
+        let input = try req.content.decode(CreateExchangeDTO.self)
+        let exchange = Exchange(
+            micCode: input.mic_code.uppercased(),
+            name: input.name,
+            countryCode: input.country_code.uppercased(),
+            timezone: input.timezone
+        )
         try await exchange.save(on: req.db)
         return req.flash("\(input.mic_code.uppercased()) added successfully.", type: "success", to: "/exchanges")
     }
@@ -38,9 +42,11 @@ struct ExchangeController: RouteCollection {
               let exchange = try await Exchange.find(id, on: req.db) else {
             return req.flash("Exchange not found.", type: "error", to: "/exchanges")
         }
-        struct Input: Content { var name: String; var country_code: String; var timezone: String }
-        let input = try req.content.decode(Input.self)
-        exchange.name = input.name; exchange.countryCode = input.country_code.uppercased(); exchange.timezone = input.timezone
+        if let r = try req.validateContent(UpdateExchangeDTO.self, redirectTo: "/exchanges") { return r }
+        let input = try req.content.decode(UpdateExchangeDTO.self)
+        exchange.name = input.name
+        exchange.countryCode = input.country_code.uppercased()
+        exchange.timezone = input.timezone
         try await exchange.save(on: req.db)
         return req.flash("\(exchange.micCode) updated successfully.", type: "success", to: "/exchanges")
     }

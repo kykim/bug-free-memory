@@ -29,18 +29,11 @@ struct OptionEODPriceController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content {
-            var instrument_id: UUID; var price_date: String
-            var bid: Double?; var ask: Double?; var last: Double?; var settlement_price: Double?
-            var volume: Int?; var open_interest: Int?; var implied_volatility: Double?
-            var delta: Double?; var gamma: Double?; var theta: Double?; var vega: Double?; var rho: Double?
-            var underlying_price: Double?; var risk_free_rate: Double?; var dividend_yield: Double?
-            var source: String?
-        }
-        let input = try req.content.decode(Input.self)
-        let fmt = ISO8601DateFormatter(); fmt.formatOptions = [.withFullDate]
-        guard let date = fmt.date(from: input.price_date) else {
-            return req.flash("Invalid date format.", type: "error", to: "/option-eod-prices")
+        if let r = try req.validateContent(CreateOptionEODPriceDTO.self, redirectTo: "/option-eod-prices") { return r }
+        let input = try req.content.decode(CreateOptionEODPriceDTO.self)
+        let date: Date
+        do { date = try input.parsedPriceDate() } catch let error as AbortError {
+            return req.flash(error.reason, type: "error", to: "/option-eod-prices")
         }
         let price = OptionEODPrice(
             instrumentID: input.instrument_id, priceDate: date,
@@ -64,14 +57,8 @@ struct OptionEODPriceController: RouteCollection {
               let price = try await OptionEODPrice.find(id, on: req.db) else {
             return req.flash("Price record not found.", type: "error", to: "/option-eod-prices")
         }
-        struct Input: Content {
-            var bid: Double?; var ask: Double?; var last: Double?; var settlement_price: Double?
-            var volume: Int?; var open_interest: Int?; var implied_volatility: Double?
-            var delta: Double?; var gamma: Double?; var theta: Double?; var vega: Double?; var rho: Double?
-            var underlying_price: Double?; var risk_free_rate: Double?; var dividend_yield: Double?
-            var source: String?
-        }
-        let input = try req.content.decode(Input.self)
+        if let r = try req.validateContent(UpdateOptionEODPriceDTO.self, redirectTo: "/option-eod-prices") { return r }
+        let input = try req.content.decode(UpdateOptionEODPriceDTO.self)
         price.bid = input.bid; price.ask = input.ask; price.last = input.last
         price.settlementPrice = input.settlement_price
         price.volume = input.volume; price.openInterest = input.open_interest

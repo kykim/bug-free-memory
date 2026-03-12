@@ -50,8 +50,7 @@ func routes(_ app: Application) throws {
             var appName: String
             var pageTitle: String
             var schwabConnected: Bool
-            var schwabAccessToken: String?
-            var schwabRefreshToken: String?
+            var schwabHasRefreshToken: Bool
             var schwabTokenExpiresAt: String?
         }
         var schwabToken: OAuthToken? = nil
@@ -65,8 +64,7 @@ func routes(_ app: Application) throws {
             appName: "bug-free-memory",
             pageTitle: "Dashboard",
             schwabConnected: schwabToken != nil,
-            schwabAccessToken: schwabToken?.accessToken,
-            schwabRefreshToken: schwabToken?.refreshToken,
+            schwabHasRefreshToken: schwabToken?.refreshToken != nil,
             schwabTokenExpiresAt: schwabToken.map { ISO8601DateFormatter().string(from: $0.expiresAt) }
         ))
     }
@@ -88,7 +86,7 @@ func routes(_ app: Application) throws {
 
     app.grouped(ClerkMiddleware(), ClerkAuthMiddleware()).get("schwab", "callback") { req async throws -> Response in
         guard let code = req.query[String.self, at: "code"] else {
-            throw Abort(.badRequest, reason: "Missing authorization code")
+            throw AppError.oauthMissingCode
         }
 
         app.logger.info("Got Schwab Callback")
@@ -110,21 +108,24 @@ func routes(_ app: Application) throws {
 
         let token = try tokenResponse.content.decode(SchwabTokenResponse.self)
         let tokenExpiresAt = Date().addingTimeInterval(TimeInterval(token.expiresIn))
+        let key = req.application.tokenEncryptionKey
+        let encryptedAccess = try TokenEncryption.encrypt(token.accessToken, key: key)
+        let encryptedRefresh = try token.refreshToken.map { try TokenEncryption.encrypt($0, key: key) }
 
         if let existing = try await OAuthToken.query(on: req.db)
             .filter(\OAuthToken.$clerkUserId, .equal, clerkUserId)
             .filter(\OAuthToken.$provider, .equal, "schwab")
             .first() {
-            existing.accessToken = token.accessToken
-            existing.refreshToken = token.refreshToken
+            existing.accessToken = encryptedAccess
+            existing.refreshToken = encryptedRefresh
             existing.expiresAt = tokenExpiresAt
             try await existing.save(on: req.db)
         } else {
             let oauthToken = OAuthToken(
                 clerkUserId: clerkUserId,
                 provider: "schwab",
-                accessToken: token.accessToken,
-                refreshToken: token.refreshToken,
+                accessToken: encryptedAccess,
+                refreshToken: encryptedRefresh,
                 expiresAt: tokenExpiresAt
             )
             try await oauthToken.save(on: req.db)
@@ -140,11 +141,13 @@ func routes(_ app: Application) throws {
             .filter(\OAuthToken.$clerkUserId, .equal, clerkUserId)
             .filter(\OAuthToken.$provider, .equal, "schwab")
             .first() else {
-            throw Abort(.badRequest, reason: "No Schwab token found")
+            throw AppError.oauthTokenNotFound
         }
-        guard let refreshToken = existing.refreshToken else {
-            throw Abort(.badRequest, reason: "No refresh token stored")
+        guard let encryptedRefreshToken = existing.refreshToken else {
+            throw AppError.oauthNoRefreshToken
         }
+        let key = req.application.tokenEncryptionKey
+        let refreshToken = try TokenEncryption.decrypt(encryptedRefreshToken, key: key)
 
         let clientID = Environment.get("SCHWAB_CLIENT_ID") ?? ""
         let clientSecret = Environment.get("SCHWAB_CLIENT_SECRET") ?? ""
@@ -160,8 +163,8 @@ func routes(_ app: Application) throws {
 
         let token = try tokenResponse.content.decode(SchwabTokenResponse.self)
         let tokenExpiresAt = Date().addingTimeInterval(TimeInterval(token.expiresIn))
-        existing.accessToken = token.accessToken
-        existing.refreshToken = token.refreshToken ?? existing.refreshToken
+        existing.accessToken = try TokenEncryption.encrypt(token.accessToken, key: key)
+        existing.refreshToken = try token.refreshToken.map { try TokenEncryption.encrypt($0, key: key) } ?? existing.refreshToken
         existing.expiresAt = tokenExpiresAt
         try await existing.save(on: req.db)
 

@@ -7,6 +7,7 @@ import Temporal
 import ClerkVapor
 import ClerkLeaf
 import TiingoKit
+import Crypto
 
 // Extend Application to store the Temporal client
 extension Application {
@@ -21,6 +22,13 @@ extension Application {
 
 // configures your application
 public func configure(_ app: Application) async throws {
+    guard let keyBase64 = Environment.get("TOKEN_ENCRYPTION_KEY"),
+          let keyData = Data(base64Encoded: keyBase64),
+          keyData.count == 32 else {
+        throw AppError.invalidEncryptionKeyConfig
+    }
+    app.tokenEncryptionKey = SymmetricKey(data: keyData)
+
     app.sessions.use(.memory)
 
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
@@ -29,7 +37,10 @@ public func configure(_ app: Application) async throws {
     app.tiingo = TiingoClient(apiKey: Environment.get("TIINGO_API_KEY") ?? "")
 
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
-    try app.databases.use(.postgres(url: databaseURL, maxConnectionsPerEventLoop: 1), as: .psql)
+    try app.databases.use(
+        .postgres(url: databaseURL, maxConnectionsPerEventLoop: 2, connectionPoolTimeout: .seconds(30)),
+        as: .psql
+    )
 
     // Register migrations
     app.migrations.add(CreateCurrencies())       // no deps

@@ -30,7 +30,7 @@ public final class PriceOptionContractWorkflow {
             retryPolicy: RetryPolicy(maximumAttempts: 3)
         )
         let mcOptions = ActivityOptions(
-            startToCloseTimeout: .seconds(900),
+            startToCloseTimeout: .seconds(120),  // Greeks moved to ComputeMonteCarloGreeksWorkflow
             retryPolicy: RetryPolicy(maximumAttempts: 2)
         )
 
@@ -45,7 +45,7 @@ public final class PriceOptionContractWorkflow {
             input: input
         )
         let mc  = try await Workflow.executeActivity(
-            PriceOptionContractActivities.Activities.PriceMonteCarlo.self,
+            PriceOptionContractActivities.Activities.PriceMonteCarloPriceOnly.self,
             options: mcOptions,
             input: input
         )

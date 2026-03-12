@@ -19,7 +19,7 @@ func startOptionPricingWorker(app: Application) async throws {
         target: .dns(host: "temporal", port: 7233),
         transportSecurity: .plaintext,
         activityContainers: PriceOptionContractActivities(db: app.db),
-        workflows: [PriceOptionContractWorkflow.self],
+        workflows: [PriceOptionContractWorkflow.self, ComputeMonteCarloGreeksWorkflow.self],
         logger: app.logger
     )
 

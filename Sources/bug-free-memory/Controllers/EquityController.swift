@@ -1,7 +1,6 @@
 import Fluent
 import Foundation
 import Leaf
-import Temporal
 import Vapor
 import ClerkVapor
 
@@ -146,11 +145,7 @@ struct EquityController: RouteCollection {
 
     func create(req: Request) async throws -> Response {
         try req.requireDashboardAuth()
-        struct Input: Content {
-            var instrument_id: UUID; var isin: String?; var cusip: String?; var figi: String?
-            var sector: String?; var industry: String?; var shares_outstanding: Int?
-        }
-        let input = try req.content.decode(Input.self)
+        let input = try req.content.decode(CreateEquityDTO.self)
         guard try await Equity.find(input.instrument_id, on: req.db) == nil else {
             return req.flash("Equity record already exists for that instrument.", type: "error", to: "/equities")
         }
@@ -173,11 +168,7 @@ struct EquityController: RouteCollection {
               let equity = try await Equity.find(id, on: req.db) else {
             return req.flash("Equity not found.", type: "error", to: "/equities")
         }
-        struct Input: Content {
-            var isin: String?; var cusip: String?; var figi: String?
-            var sector: String?; var industry: String?; var shares_outstanding: Int?
-        }
-        let input = try req.content.decode(Input.self)
+        let input = try req.content.decode(UpdateEquityDTO.self)
         equity.isin     = input.isin.ifNotEmpty
         equity.cusip    = input.cusip.ifNotEmpty
         equity.figi     = input.figi.ifNotEmpty
@@ -209,12 +200,7 @@ struct EquityController: RouteCollection {
         }
         let ticker = try equity.joined(Instrument.self).ticker
         let startDate = Calendar.current.date(byAdding: .year, value: -1, to: Date())!
-        let input = UpdateEODPricesInput(equityID: id, ticker: ticker, startDate: startDate, endDate: nil)
-        _ = try await req.application.temporal.startWorkflow(
-            type: UpdateEODPricesWorkflow.self,
-            options: .init(id: "backfill-\(id)-\(UUID())", taskQueue: "eod-prices"),
-            input: input
-        )
+        try await req.eodPriceService.backfill(equityID: id, ticker: ticker, from: startDate)
         return req.flash("Backfill started for \(ticker).", type: "success", to: "/equities/\(id.uuidString)")
     }
 
@@ -228,13 +214,7 @@ struct EquityController: RouteCollection {
             return req.flash("Equity not found.", type: "error", to: "/equities")
         }
         let ticker = try equity.joined(Instrument.self).ticker
-        let today = Calendar.current.startOfDay(for: Date())
-        let input = UpdateEODPricesInput(equityID: id, ticker: ticker, startDate: today, endDate: today)
-        _ = try await req.application.temporal.startWorkflow(
-            type: UpdateEODPricesWorkflow.self,
-            options: .init(id: "fetch-today-\(id)-\(UUID())", taskQueue: "eod-prices"),
-            input: input
-        )
+        try await req.eodPriceService.fetchToday(equityID: id, ticker: ticker)
         return req.flash("Today's EOD price fetch started for \(ticker).", type: "success", to: "/equities/\(id.uuidString)")
     }
 }

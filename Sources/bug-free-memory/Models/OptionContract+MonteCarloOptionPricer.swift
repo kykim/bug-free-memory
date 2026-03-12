@@ -23,7 +23,7 @@ import Vapor
 struct MonteCarloResult: Content {
     let price: Double               // Per-share theoretical value
     let contractValue: Double       // price × contractMultiplier
-    let greeks: Greeks
+    let greeks: Greeks?             // nil when computeGreeks: false was passed
     let standardError: Double       // Monte Carlo standard error of price
     let confidenceInterval: ClosedRange<Double>  // 95% CI
     let simulationCount: Int
@@ -48,7 +48,7 @@ extension MonteCarloResult {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(price,                 forKey: .price)
         try c.encode(contractValue,         forKey: .contractValue)
-        try c.encode(greeks,                forKey: .greeks)
+        try c.encodeIfPresent(greeks,       forKey: .greeks)
         try c.encode(standardError,         forKey: .standardError)
         try c.encode(confidenceInterval.lowerBound, forKey: .ciLower)
         try c.encode(confidenceInterval.upperBound, forKey: .ciUpper)
@@ -64,7 +64,7 @@ extension MonteCarloResult {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         price                = try c.decode(Double.self,  forKey: .price)
         contractValue        = try c.decode(Double.self,  forKey: .contractValue)
-        greeks               = try c.decode(Greeks.self,  forKey: .greeks)
+        greeks               = try c.decodeIfPresent(Greeks.self, forKey: .greeks)
         standardError        = try c.decode(Double.self,  forKey: .standardError)
         let lo               = try c.decode(Double.self,  forKey: .ciLower)
         let hi               = try c.decode(Double.self,  forKey: .ciUpper)
@@ -119,7 +119,8 @@ extension OptionContract {
         lookback: Int = 30,
         simulations: Int = 100_000,
         stepsPerPath: Int = 252,
-        bermudanExerciseDates: [Date] = []
+        bermudanExerciseDates: [Date] = [],
+        computeGreeks: Bool = true
     ) -> MonteCarloResult? {
 
         let S     = currentPrice.adjClose ?? currentPrice.close
@@ -132,7 +133,8 @@ extension OptionContract {
         let (price, greeks, se) = _monteCarlo(
             S: S, K: K, T: T, r: riskFreeRate, sigma: sigma,
             simulations: simulations, steps: stepsPerPath,
-            bermudanDates: bermudanExerciseDates
+            bermudanDates: bermudanExerciseDates,
+            computeGreeks: computeGreeks
         )
 
         let z95   = 1.96
@@ -165,19 +167,28 @@ extension OptionContract {
     private func _monteCarlo(
         S: Double, K: Double, T: Double, r: Double, sigma: Double,
         simulations: Int, steps: Int,
-        bermudanDates: [Date]
-    ) -> (price: Double, greeks: Greeks, standardError: Double) {
+        bermudanDates: [Date],
+        computeGreeks: Bool
+    ) -> (price: Double, greeks: Greeks?, standardError: Double) {
 
         switch exerciseStyle {
         case .european:
-            return _simulateEuropean(S: S, K: K, T: T, r: r, sigma: sigma, simulations: simulations)
+            let (price, se) = _europeanPriceOnly(S: S, K: K, T: T, r: r, sigma: sigma,
+                                                  simulations: simulations)
+            let greeks: Greeks? = computeGreeks
+                ? _europeanGreeks(S: S, K: K, T: T, r: r, sigma: sigma,
+                                  simulations: simulations, basePrice: price)
+                : nil
+            return (price, greeks, se)
         case .american:
             let price = _simulateLSM(S: S, K: K, T: T, r: r, sigma: sigma,
                                      simulations: simulations, steps: steps,
                                      exerciseSteps: nil)
-            let greeks = _monteCarloGreeks(S: S, K: K, T: T, r: r, sigma: sigma,
-                                           simulations: simulations, steps: steps,
-                                           exerciseSteps: nil, basePrice: price)
+            let greeks: Greeks? = computeGreeks
+                ? _monteCarloGreeks(S: S, K: K, T: T, r: r, sigma: sigma,
+                                    simulations: simulations, steps: steps,
+                                    exerciseSteps: nil, basePrice: price)
+                : nil
             // SE approximated from European engine (conservative upper bound for American)
             let (_, se) = _europeanPriceOnly(S: S, K: K, T: T, r: r, sigma: sigma,
                                              simulations: simulations)
@@ -187,10 +198,12 @@ extension OptionContract {
             let price = _simulateLSM(S: S, K: K, T: T, r: r, sigma: sigma,
                                      simulations: simulations, steps: steps,
                                      exerciseSteps: exerciseSteps.isEmpty ? nil : exerciseSteps)
-            let greeks = _monteCarloGreeks(S: S, K: K, T: T, r: r, sigma: sigma,
-                                           simulations: simulations, steps: steps,
-                                           exerciseSteps: exerciseSteps.isEmpty ? nil : exerciseSteps,
-                                           basePrice: price)
+            let greeks: Greeks? = computeGreeks
+                ? _monteCarloGreeks(S: S, K: K, T: T, r: r, sigma: sigma,
+                                    simulations: simulations, steps: steps,
+                                    exerciseSteps: exerciseSteps.isEmpty ? nil : exerciseSteps,
+                                    basePrice: price)
+                : nil
             let (_, se) = _europeanPriceOnly(S: S, K: K, T: T, r: r, sigma: sigma,
                                              simulations: simulations)
             return (price, greeks, se)
@@ -235,19 +248,6 @@ extension OptionContract {
         let variance = count > 1 ? m2 / Double(count - 1) : 0
         let se       = df * sqrt(variance / Double(count))
         return (price, se)
-    }
-
-    /// Full European simulation: price + greeks + standard error.
-    private func _simulateEuropean(
-        S: Double, K: Double, T: Double, r: Double, sigma: Double,
-        simulations: Int
-    ) -> (price: Double, greeks: Greeks, standardError: Double) {
-
-        let (price, se) = _europeanPriceOnly(S: S, K: K, T: T, r: r, sigma: sigma,
-                                             simulations: simulations)
-        let greeks = _europeanGreeks(S: S, K: K, T: T, r: r, sigma: sigma,
-                                     simulations: simulations, basePrice: price)
-        return (price, greeks, se)
     }
 
     // MARK: American / Bermudan -- Longstaff-Schwartz LSM
@@ -550,10 +550,10 @@ extension OptionContract {
             let body = try req.content.decode(MCPricingRequest.self)
 
             guard let optionID = req.parameters.get("optionID", as: UUID.self) else {
-                throw Abort(.badRequest, reason: "Invalid option ID")
+                throw AppError.invalidRouteParameter("optionID")
             }
             guard let contract = try await OptionContract.find(optionID, on: req.db) else {
-                throw Abort(.notFound, reason: "Option contract not found")
+                throw AppError.contractNotFound
             }
 
             let history = try await EODPrice.query(on: req.db)
@@ -563,7 +563,7 @@ extension OptionContract {
                 .all()
 
             guard let latest = history.first else {
-                throw Abort(.notFound, reason: "No price data found for underlying")
+                throw AppError.noUnderlyingPriceData
             }
 
             guard let result = contract.monteCarloPrice(
@@ -575,7 +575,7 @@ extension OptionContract {
                 stepsPerPath: body.stepsPerPath,
                 bermudanExerciseDates: body.bermudanExerciseDates ?? []
             ) else {
-                throw Abort(.unprocessableEntity, reason: "Monte Carlo pricing failed — check inputs or price history")
+                throw AppError.pricingFailed
             }
 
             return MCPricingResponse(monteCarlo: result)
