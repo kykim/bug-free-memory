@@ -1,0 +1,113 @@
+#extend("base"):
+#export("title"):#(osiSymbol) — Option Detail#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"):active#endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+<div class="page-header">
+    <div class="page-title">#(osiSymbol)<small>#(underlyingTicker) #(optionType) #(strikePrice) exp #(expirationDate)</small></div>
+    <a href="/option-contracts" class="btn btn-ghost">← Option Contracts</a>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Contract details</div>
+    <div class="form-row">
+        <div class="form-group fg-md"><label>Underlying</label><div class="td-accent">#(underlyingTicker)</div></div>
+        <div class="form-group fg-sm"><label>Type</label><div><span class="badge badge-#(optionType)">#(optionType)</span></div></div>
+        <div class="form-group fg-sm"><label>Style</label><div class="td-muted">#(exerciseStyle)</div></div>
+        <div class="form-group fg-sm"><label>Strike</label><div class="td-mono">#(strikePrice)</div></div>
+        <div class="form-group fg-md"><label>Expiration</label><div class="td-mono">#(expirationDate)</div></div>
+        <div class="form-group fg-sm"><label>Multiplier</label><div class="td-muted">#(contractMultiplier)</div></div>
+        <div class="form-group fg-sm"><label>Settlement</label><div class="td-muted">#(settlementType)</div></div>
+        <div class="form-group fg-lg"><label>OSI Symbol</label><div class="td-mono">#(osiSymbol)</div></div>
+    </div>
+</div>
+
+<div class="page-header" style="margin-top:2rem">
+    <div class="page-title" style="font-size:1rem">Theoretical Prices<small>Black-Scholes, Binomial CRR &amp; Monte Carlo</small></div>
+    <form method="post" action="/option-contracts/#(id)/calculate-price">
+        <button type="submit" class="btn btn-ghost">Calculate Price</button>
+    </form>
+</div>
+
+#if(theoreticalPrices):
+<div class="table-wrap" style="margin-bottom:2rem">
+    <table>
+        <thead><tr><th>Model</th><th>Date</th><th>Und. Price</th><th>Price / Share</th><th>Hist. Vol</th><th>IV</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>Rho</th></tr></thead>
+        <tbody>
+        #for(p in theoreticalPrices):
+        <tr>
+            <td class="td-muted">#(p.model)</td>
+            <td class="td-mono">#(p.priceDate)</td>
+            <td class="td-mono">#(p.underlyingPrice)</td>
+            <td class="td-mono"><strong>#(p.price)</strong></td>
+            <td class="td-mono">#(p.historicalVolatility)</td>
+            <td class="td-mono">#(p.impliedVolatility)</td>
+            <td class="td-mono">#(p.delta)</td>
+            <td class="td-mono">#(p.gamma)</td>
+            <td class="td-mono">#(p.theta)</td>
+            <td class="td-mono">#(p.vega)</td>
+            <td class="td-mono">#(p.rho)</td>
+        </tr>
+        #endfor
+        </tbody>
+    </table>
+</div>
+#endif
+
+<div class="page-header" style="margin-top:2rem">
+    <div class="page-title" style="font-size:1rem">EOD Prices<small>page #(page)</small></div>
+    <div class="row-count"><strong>#count(prices)</strong> records</div>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Date</th><th>Bid</th><th>Ask</th><th>Mid</th><th>Last</th><th>Settle</th><th>Volume</th><th>OI</th><th>IV</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>Und. Price</th><th>Source</th></tr></thead>
+        <tbody>
+        #if(prices):
+            #for(p in prices):
+            <tr>
+                <td class="td-mono">#(p.priceDate)</td>
+                <td class="td-mono">#(p.bid)</td>
+                <td class="td-mono">#(p.ask)</td>
+                <td class="td-mono">#(p.mid)</td>
+                <td class="td-mono">#(p.last)</td>
+                <td class="td-mono">#(p.settlementPrice)</td>
+                <td class="td-muted">#(p.volume)</td>
+                <td class="td-muted">#(p.openInterest)</td>
+                <td class="td-mono">#(p.impliedVolatility)</td>
+                <td class="td-mono">#(p.delta)</td>
+                <td class="td-mono">#(p.gamma)</td>
+                <td class="td-mono">#(p.theta)</td>
+                <td class="td-mono">#(p.vega)</td>
+                <td class="td-mono">#(p.underlyingPrice)</td>
+                <td class="td-muted">#(p.source)</td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="15"><div class="empty">No EOD price records found for this contract.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    #if(page > 1):
+    <a href="/option-contracts/#(id)?page=#(prevPage)" class="btn btn-ghost">← Newer</a>
+    #endif
+    #if(hasNextPage):
+    <a href="/option-contracts/#(id)?page=#(nextPage)" class="btn btn-ghost">Older →</a>
+    #endif
+</div>
+#endexport
+#endextend

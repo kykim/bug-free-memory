@@ -33,6 +33,7 @@
                     <a href="/eod-prices">EOD Prices</a>
                     <a href="/option-eod-prices">Option Prices</a>
                     <a href="/corporate-actions">Corp Actions</a>
+                    <a href="/fred-yields">FRED Yields</a>
                 </nav>
             </div>
             <div class="clerk-signed-in">
@@ -71,6 +72,10 @@
                                 <span class="meta-label">User ID</span>
                                 <code id="user-id"></code>
                             </div>
+                            <div class="meta-item">
+                                <span class="meta-label">JWT</span>
+                                <pre id="user-jwt" style="font-size:0.7rem;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
+                            </div>
                             <div class="meta-item" id="org-section" style="display:none">
                                 <span class="meta-label">Organisation</span>
                                 <span id="user-org"></span>
@@ -87,6 +92,49 @@
                 <div class="dashboard-content">
                     <div class="panel-label">Application</div>
                     <p class="content-hint">Add your app content here.</p>
+                    <div class="panel-label" style="margin-top:24px">Integrations</div>
+                    #if(schwabConnected):
+                    <div class="insert-panel" style="margin-top:0.5rem">
+                        <div class="form-row">
+                            <div class="form-group fg-sm">
+                                <label>Schwab</label>
+                                <span class="badge badge-call">connected</span>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group fg-lg">
+                                <label>Access Token</label>
+                                <code class="td-mono" style="font-size:0.75rem;word-break:break-all">#(schwabAccessToken)</code>
+                            </div>
+                        </div>
+                        #if(schwabRefreshToken):
+                        <div class="form-row">
+                            <div class="form-group fg-lg">
+                                <label>Refresh Token</label>
+                                <code class="td-mono" style="font-size:0.75rem;word-break:break-all">#(schwabRefreshToken)</code>
+                            </div>
+                        </div>
+                        #endif
+                        #if(schwabTokenExpiresAt):
+                        <div class="form-row">
+                            <div class="form-group fg-sm">
+                                <label>Token Expires At</label>
+                                <code class="td-mono">#(schwabTokenExpiresAt)</code>
+                            </div>
+                        </div>
+                        #endif
+                        <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                            #if(schwabRefreshToken):
+                            <form method="POST" action="/schwab/refresh">
+                                <button type="submit" class="btn btn-ghost">Refresh →</button>
+                            </form>
+                            #endif
+                            <a class="btn btn-ghost" href="/schwab/login">Reconnect →</a>
+                        </div>
+                    </div>
+                    #else:
+                    <a class="btn" href="/schwab/login">Connect Schwab →</a>
+                    #endif
                 </div>
 
             </div>
@@ -142,6 +190,20 @@
             }
 
             document.getElementById('user-id').textContent = user.id;
+
+            // Decoded JWT
+            var jwtEl = document.getElementById('user-jwt');
+            if (jwtEl && window.Clerk.session) {
+                window.Clerk.session.getToken().then(function (token) {
+                    try {
+                        var payload = token.split('.')[1];
+                        var decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+                        jwtEl.textContent = JSON.stringify(decoded, null, 2);
+                    } catch (e) {
+                        jwtEl.textContent = token;
+                    }
+                });
+            }
 
             var org = window.Clerk.organization;
             if (org) {

@@ -26,9 +26,6 @@ final class OptionContract: Model, Content, @unchecked Sendable {
     @ID(custom: "instrument_id", generatedBy: .user)
     var id: UUID?
 
-    @Parent(key: "instrument_id")
-    var instrument: Instrument
-
     @Parent(key: "underlying_id")
     var underlying: Instrument
 
@@ -67,7 +64,6 @@ final class OptionContract: Model, Content, @unchecked Sendable {
         osiSymbol: String? = nil
     ) {
         self.id = instrumentID
-        self.$instrument.id = instrumentID
         self.$underlying.id = underlyingID
         self.optionType = optionType
         self.exerciseStyle = exerciseStyle

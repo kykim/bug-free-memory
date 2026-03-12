@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <a href="/eod-prices"        class="#import("nav_eod_prices")"       >EOD Prices</a>
                 <a href="/option-eod-prices" class="#import("nav_option_eod")"       >Option Prices</a>
                 <a href="/corporate-actions" class="#import("nav_corp_actions")"     >Corp Actions</a>
+                <a href="/fred-yields"       class="#import("nav_fred_yields")"      >FRED Yields</a>
             </nav>
         </div>
         <div class="clerk-signed-in">

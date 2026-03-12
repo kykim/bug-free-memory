@@ -19,6 +19,12 @@ x-shared_environment: &shared_environment
   CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
   DATABASE_URL: ${DATABASE_URL:-postgres://vapor:password@localhost:5432/vapor}
   TIINGO_API_KEY: ${TIINGO_API_KEY}
+  SCHWAB_CLIENT_ID: ${SCHWAB_CLIENT_ID}
+  SCHWAB_CLIENT_SECRET: ${SCHWAB_CLIENT_SECRET}
+  SCHWAB_REDIRECT_URI: ${SCHWAB_REDIRECT_URI:-http://localhost:8080/schwab/callback}
+  NGROK_AUTH_TOKEN: ${NGROK_AUTH_TOKEN}
+  NGROK_DOMAIN: ${NGROK_DOMAIN}
+  FRED_API_KEY: ${FRED_API_KEY}
   
 services:
   app:
@@ -28,12 +34,25 @@ services:
     environment:
       <<: *shared_environment
     depends_on:
-      - db
-      - temporal
+      db:
+        condition: service_healthy
+      temporal:
+        condition: service_started
     ports:
       - '8080:8080'
     # user: '0' # uncomment to run as root for testing purposes even though Dockerfile defines 'vapor' user.
     command: ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
+
+  worker:
+    image: bug-free-memory:latest
+    environment:
+      <<: *shared_environment
+    depends_on:
+      db:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    command: ["worker", "--env", "production"]
 
   db:
     image: postgres:18-alpine
@@ -43,11 +62,51 @@ services:
       POSTGRES_DB: vapor
     ports:
       - "5432:5432"
-      
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vapor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+#  temporal:
+#    image: temporalio/temporal:latest
+#    container_name: temporal
+#    ports:
+#      - 7233:7233
+#      - 8233:8233
+#    command: server start-dev --ip 0.0.0.0
+
   temporal:
-    image: temporalio/temporal:latest
+    image: temporalio/auto-setup:latest
     container_name: temporal
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=vapor
+      - POSTGRES_PWD=password
+      - POSTGRES_SEEDS=db
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - 7233:7233
-      - 8233:8233
-    command: server start-dev --ip 0.0.0.0
+    volumes:
+      - ./config/dynamicconfig:/etc/temporal/config/dynamicconfig
+      
+  temporal-ui:
+    image: temporalio/ui:latest
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    ports:
+      - 8233:8080
+    depends_on:
+      - temporal
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    command: "http --url=${NGROK_DOMAIN} app:8080"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTH_TOKEN}
+    ports:
+      - 4040:4040

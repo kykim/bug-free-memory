@@ -39,9 +39,6 @@ final class Instrument: Model, Content, @unchecked Sendable {
     @OptionalChild(for: \.$instrument)
     var index: Index?
 
-    @OptionalChild(for: \.$instrument)
-    var optionContract: OptionContract?
-
     @Children(for: \.$instrument)
     var eodPrices: [EODPrice]
 

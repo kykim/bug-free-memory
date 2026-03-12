@@ -21,8 +21,11 @@ extension Application {
 
 // configures your application
 public func configure(_ app: Application) async throws {
+    app.sessions.use(.memory)
+
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
-    
+    app.middleware.use(app.sessions.middleware)
+
     app.tiingo = TiingoClient(apiKey: Environment.get("TIINGO_API_KEY") ?? "")
 
     let databaseURL = Environment.get("DATABASE_URL") ?? "postgres://vapor:password@localhost:5432/vapor"
@@ -38,6 +41,9 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateEODPrices())        // depends on instruments
     app.migrations.add(CreateOptionEODPrices())  // depends on instruments
     app.migrations.add(CreateCorporateActions()) // depends on instruments
+    app.migrations.add(CreateTheoreticalOptionEODPrice())
+    app.migrations.add(CreateFREDYield())
+    app.migrations.add(CreateOAuthToken())
 
     try await app.autoMigrate()
 
@@ -46,7 +52,11 @@ public func configure(_ app: Application) async throws {
         publishableKey: Environment.get("CLERK_PUBLISHABLE_KEY"),
         // Optional: PEM key for networkless JWT verification
         // jwtKey: Environment.get("CLERK_JWT_KEY"),
-        authorizedParties: ["https://bug-free-memory-4mtc.onrender.com", "http://localhost:8080"]
+        authorizedParties: [
+            "https://bug-free-memory-4mtc.onrender.com",
+            "https://sandee-locular-hereditarily.ngrok-free.dev",
+            "http://localhost:8080"
+        ]
     ))
     app.useClerkLeaf()               // registers tags + enables Leaf renderer
     app.addClerkLeafSources()        // registers both your app's Views + the bundled Clerk templates
@@ -61,7 +71,8 @@ public func configure(_ app: Application) async throws {
         ),
         logger: app.logger
     )
-    app.lifecycle.use(TemporalWorkerService(app: app))
+    app.lifecycle.use(TemporalClientService(app: app))
+    app.asyncCommands.use(WorkerCommand(), as: "worker")
 
     // register routes
     try app.register(collection: CurrencyController())
@@ -73,6 +84,7 @@ public func configure(_ app: Application) async throws {
     try app.register(collection: EODPriceController())
     try app.register(collection: OptionEODPriceController())
     try app.register(collection: CorporateActionController())
+    try app.register(collection: FREDYieldController())
     try routes(app)
 }
 
