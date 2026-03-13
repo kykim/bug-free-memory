@@ -16,7 +16,7 @@ enum SchwabError: Error {
     case noTokenFound
     case authFailure
     case requestFailed(statusCode: Int)
-    case decodingFailed(Error)
+    case decodingFailed(any Error)
     case noAccountNumber
 }
 
