@@ -16,27 +16,20 @@ import Logging
 import Temporal
 
 @ActivityContainer
-public struct OptionEODPriceActivities {
+struct OptionEODPriceActivities {
 
     private let db: any Database
     private let schwabClient: SchwabClient
     private let logger: Logger
 
-    public init(db: any Database, schwabClient: SchwabClient, logger: Logger) {
+    init(db: any Database, schwabClient: SchwabClient, logger: Logger) {
         self.db = db
         self.schwabClient = schwabClient
         self.logger = logger
     }
 
-    @Activity(
-        retryPolicy: RetryPolicy(
-            initialInterval: .seconds(30),
-            backoffCoefficient: 2.0,
-            maximumAttempts: 3
-        ),
-        scheduleToCloseTimeout: .seconds(600)
-    )
-    public func fetchAndUpsertOptionEODPrices(runDate: Date) async throws -> OptionEODResult {
+    @Activity
+    func fetchAndUpsertOptionEODPrices(runDate: Date) async throws -> OptionEODResult {
         // 1. Refresh token
         try await schwabClient.refreshTokenIfNeeded(db: db)
 
