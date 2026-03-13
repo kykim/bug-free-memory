@@ -36,13 +36,12 @@ func startDailyPipelineWorker(app: Application) async throws {
         ),
         target: .dns(host: "temporal", port: 7233),
         transportSecurity: .plaintext,
-        activityContainers: [
+        activityContainers:
             PortfolioActivities(db: app.db, schwabClient: schwabClient, logger: app.logger),
             EODPriceActivities(db: app.db, tiingoClient: app.tiingo, logger: app.logger),
             OptionEODPriceActivities(db: app.db, schwabClient: schwabClient, logger: app.logger),
             PricingActivities(db: app.db, logger: app.logger),
             RunLogActivities(db: app.db, logger: app.logger),
-        ],
         workflows: [DailyPipelineWorkflow.self],
         logger: app.logger
     )
