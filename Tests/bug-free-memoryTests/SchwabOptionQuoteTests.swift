@@ -89,19 +89,22 @@ struct FetchOptionEODPriceTests {
 
     private let osiSymbol = "AAPL  260320C00175000"
 
-    private func makeClient() -> SchwabClient {
-        SchwabClient(accountNumber: "ACC123", clientID: "cid", clientSecret: "csecret",
-                     encryptionKey: .init(size: .bits256), accessToken: "tok")
-    }
-
-    private func registerMock(_ handler: @escaping @Sendable (URLRequest) throws -> (Data, HTTPURLResponse)) {
+    private func makeClient(handler: @escaping @Sendable (URLRequest) throws -> (Data, HTTPURLResponse)) -> SchwabClient {
         MockURLProtocol.handler = handler
-        URLProtocol.registerClass(MockURLProtocol.self)
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: config)
+        return SchwabClient(accountNumber: "ACC123", clientID: "cid", clientSecret: "csecret",
+                            encryptionKey: .init(size: .bits256), accessToken: "tok",
+                            session: session)
     }
 
-    private func unregisterMock() {
-        URLProtocol.unregisterClass(MockURLProtocol.self)
+    private func clearMock() {
         MockURLProtocol.handler = nil
+    }
+
+    private func resp200(url: URL = URL(string: "https://api.schwabapi.com")!) -> HTTPURLResponse {
+        HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
     }
 
     @Test("Returns quote when symbol is present in response")
@@ -113,11 +116,9 @@ struct FetchOptionEODPriceTests {
             }
         }
         """.data(using: .utf8)!
-        registerMock { _ in (json, HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
-                                                   statusCode: 200, httpVersion: nil, headerFields: nil)!) }
-        defer { unregisterMock() }
-
-        let quote = try await makeClient().fetchOptionEODPrice(osiSymbol: osiSymbol)
+        let client = makeClient { _ in (json, self.resp200()) }
+        defer { clearMock() }
+        let quote = try await client.fetchOptionEODPrice(osiSymbol: osiSymbol)
         #expect(quote != nil)
         #expect(quote?.bid == 1.10)
         #expect(quote?.ask == 1.20)
@@ -127,11 +128,9 @@ struct FetchOptionEODPriceTests {
     @Test("Returns nil when symbol is absent from response")
     func returnsNilWhenAbsent() async throws {
         let json = "{}".data(using: .utf8)!
-        registerMock { _ in (json, HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
-                                                   statusCode: 200, httpVersion: nil, headerFields: nil)!) }
-        defer { unregisterMock() }
-
-        let quote = try await makeClient().fetchOptionEODPrice(osiSymbol: osiSymbol)
+        let client = makeClient { _ in (json, self.resp200()) }
+        defer { clearMock() }
+        let quote = try await client.fetchOptionEODPrice(osiSymbol: osiSymbol)
         #expect(quote == nil)
     }
 
@@ -139,15 +138,13 @@ struct FetchOptionEODPriceTests {
     func urlEncoding() async throws {
         nonisolated(unsafe) var capturedURL: URL?
         let json = "{}".data(using: .utf8)!
-        registerMock { req in
+        let client = makeClient { req in
             capturedURL = req.url
             return (json, HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
-        defer { unregisterMock() }
-
-        _ = try await makeClient().fetchOptionEODPrice(osiSymbol: osiSymbol)
+        defer { clearMock() }
+        _ = try await client.fetchOptionEODPrice(osiSymbol: osiSymbol)
         let urlString = capturedURL?.absoluteString ?? ""
-        // Spaces in OSI symbol must be percent-encoded
         #expect(urlString.contains("AAPL"))
         #expect(!urlString.contains(" "))
         #expect(urlString.contains("quotes?symbols="))
@@ -157,24 +154,22 @@ struct FetchOptionEODPriceTests {
     func authHeader() async throws {
         nonisolated(unsafe) var capturedRequest: URLRequest?
         let json = "{}".data(using: .utf8)!
-        registerMock { req in
+        let client = makeClient { req in
             capturedRequest = req
             return (json, HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
-        defer { unregisterMock() }
-
-        _ = try await makeClient().fetchOptionEODPrice(osiSymbol: osiSymbol)
+        defer { clearMock() }
+        _ = try await client.fetchOptionEODPrice(osiSymbol: osiSymbol)
         #expect(capturedRequest?.value(forHTTPHeaderField: "Authorization") == "Bearer tok")
     }
 
     @Test("Throws authFailure on 401")
     func authFailure() async throws {
-        registerMock { _ in (Data(), HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
-                                                     statusCode: 401, httpVersion: nil, headerFields: nil)!) }
-        defer { unregisterMock() }
-
+        let client = makeClient { _ in (Data(), HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
+                                                                statusCode: 401, httpVersion: nil, headerFields: nil)!) }
+        defer { clearMock() }
         do {
-            _ = try await makeClient().fetchOptionEODPrice(osiSymbol: osiSymbol)
+            _ = try await client.fetchOptionEODPrice(osiSymbol: osiSymbol)
             Issue.record("Expected authFailure")
         } catch SchwabError.authFailure { /* expected */ }
     }

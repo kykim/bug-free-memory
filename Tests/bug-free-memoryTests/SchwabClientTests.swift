@@ -49,15 +49,23 @@ private func mockResponse(statusCode: Int, body: String = "{}",
 
 // MARK: - Helpers
 
-private func makeClient(accountNumber: String = "ACC123") -> SchwabClient {
+private func makeClient(accountNumber: String = "ACC123", session: URLSession = .shared) -> SchwabClient {
     let key = SymmetricKey(size: .bits256)
     return SchwabClient(
         accountNumber: accountNumber,
         clientID: "cid",
         clientSecret: "csecret",
         encryptionKey: key,
-        accessToken: "test-token"
+        accessToken: "test-token",
+        session: session
     )
+}
+
+private func makeMockSession(handler: @escaping @Sendable (URLRequest) throws -> (Data, HTTPURLResponse)) -> URLSession {
+    MockURLProtocol.handler = handler
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [MockURLProtocol.self]
+    return URLSession(configuration: config)
 }
 
 private func withOAuthDB(_ body: (any Database) async throws -> Void) async throws {
@@ -176,70 +184,40 @@ struct AuthorizedRequestTests {
 @Suite("SchwabClient.execute", .serialized)
 struct ExecuteTests {
 
-    private func withMock(_ handler: @escaping @Sendable (URLRequest) throws -> (Data, HTTPURLResponse),
-                          run body: () async throws -> Void) async throws {
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
-        MockURLProtocol.handler = handler
-        defer { MockURLProtocol.handler = nil }
-        try await body()
-    }
-
     @Test("Returns decoded value on 200")
     func success() async throws {
         struct Greeting: Decodable { let message: String }
         let json = #"{"message":"hello"}"#
-        try await withMock({ req in (Data(json.utf8), mockResponse(statusCode: 200)) }) {
-            let client = makeClient()
-            let config = URLSessionConfiguration.ephemeral
-            config.protocolClasses = [MockURLProtocol.self]
-            let session = URLSession(configuration: config)
-            let url = URL(string: "https://api.schwabapi.com/test")!
-            let request = URLRequest(url: url)
-            let (data, _) = try await session.data(for: request)
-            let result = try JSONDecoder().decode(Greeting.self, from: data)
-            #expect(result.message == "hello")
-            _ = client  // suppress unused warning
-        }
+        let session = makeMockSession { _ in (Data(json.utf8), mockResponse(statusCode: 200)) }
+        defer { MockURLProtocol.handler = nil }
+        let client = makeClient(session: session)
+        let url = URL(string: "https://api.schwabapi.com/test")!
+        let request = URLRequest(url: url)
+        let result = try await client.execute(request, as: Greeting.self)
+        #expect(result.message == "hello")
     }
 
     @Test("Throws authFailure on 401")
     func authFailure() async throws {
-        MockURLProtocol.handler = { _ in (Data(), mockResponse(statusCode: 401)) }
+        let session = makeMockSession { _ in (Data(), mockResponse(statusCode: 401)) }
         defer { MockURLProtocol.handler = nil }
-
-        let client = makeClient()
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
-        // Swap in our session by reaching the execute path via a URLRequest
+        let client = makeClient(session: session)
         let url = URL(string: "https://api.schwabapi.com/test")!
         var request = URLRequest(url: url)
         request.setValue("Bearer test-token", forHTTPHeaderField: "Authorization")
-
-        // Since execute uses URLSession.shared we register at the class level
-        URLProtocol.registerClass(MockURLProtocol.self)
-        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
-
         do {
             _ = try await client.execute(request, as: [String: String].self)
             Issue.record("Expected authFailure to be thrown")
-        } catch SchwabError.authFailure {
-            // expected
-        }
+        } catch SchwabError.authFailure { /* expected */ }
     }
 
     @Test("Throws requestFailed on 500")
     func serverError() async throws {
-        MockURLProtocol.handler = { _ in (Data(), mockResponse(statusCode: 500)) }
+        let session = makeMockSession { _ in (Data(), mockResponse(statusCode: 500)) }
         defer { MockURLProtocol.handler = nil }
-
-        URLProtocol.registerClass(MockURLProtocol.self)
-        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
-
-        let client = makeClient()
+        let client = makeClient(session: session)
         let url = URL(string: "https://api.schwabapi.com/test")!
         let request = URLRequest(url: url)
-
         do {
             _ = try await client.execute(request, as: [String: String].self)
             Issue.record("Expected requestFailed to be thrown")
@@ -250,14 +228,10 @@ struct ExecuteTests {
 
     @Test("Throws decodingFailed on invalid JSON")
     func decodingError() async throws {
-        MockURLProtocol.handler = { _ in (Data("not json".utf8), mockResponse(statusCode: 200)) }
+        let session = makeMockSession { _ in (Data("not json".utf8), mockResponse(statusCode: 200)) }
         defer { MockURLProtocol.handler = nil }
-
-        URLProtocol.registerClass(MockURLProtocol.self)
-        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
-
         struct Typed: Decodable { let value: Int }
-        let client = makeClient()
+        let client = makeClient(session: session)
         let url = URL(string: "https://api.schwabapi.com/test")!
         let request = URLRequest(url: url)
 

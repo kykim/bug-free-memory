@@ -20,6 +20,32 @@ import FluentSQLiteDriver
 import VaporTesting
 @testable import bug_free_memory
 
+// MARK: - Isolated mock protocol for OptionEODPriceActivity tests
+
+final class MockOptionEODURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (Data, HTTPURLResponse))?
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = MockOptionEODURLProtocol.handler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unknown))
+            return
+        }
+        do {
+            let (data, response) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
 // MARK: - SQLite-compatible option_eod_prices migration (no generated column)
 
 struct TestCreateOptionEODPrices: AsyncMigration {
@@ -60,9 +86,12 @@ private func withOptionEODDB(
     _ body: (any Database, SchwabClient) async throws -> Void
 ) async throws {
     let key = SymmetricKey(size: .bits256)
+    let mockConfig = URLSessionConfiguration.ephemeral
+    mockConfig.protocolClasses = [MockOptionEODURLProtocol.self]
+    let mockSession = URLSession(configuration: mockConfig)
     let client = SchwabClient(
         accountNumber: "ACC123", clientID: "cid", clientSecret: "csecret",
-        encryptionKey: key, accessToken: "")
+        encryptionKey: key, accessToken: "", session: mockSession)
 
     try await withApp(configure: { app in
         app.databases.use(.sqlite(.memory), as: .sqlite)
@@ -142,16 +171,14 @@ private func quoteJSON(_ osiSymbol: String, bid: Double = 1.10, ask: Double = 1.
 private func emptyQuoteJSON() -> Data { Data("{}".utf8) }
 
 private func mockSchwab(_ body: Data, statusCode: Int = 200) {
-    MockURLProtocol.handler = { _ in
+    MockOptionEODURLProtocol.handler = { _ in
         (body, HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
                                statusCode: statusCode, httpVersion: nil, headerFields: nil)!)
     }
-    URLProtocol.registerClass(MockURLProtocol.self)
 }
 
 private func unmockSchwab() {
-    URLProtocol.unregisterClass(MockURLProtocol.self)
-    MockURLProtocol.handler = nil
+    MockOptionEODURLProtocol.handler = nil
 }
 
 private func futureDate(daysFromNow: Int = 30) -> Date {
@@ -280,14 +307,13 @@ struct OptionEODPriceActivityTests {
             }
 
             nonisolated(unsafe) var callCount = 0
-            MockURLProtocol.handler = { req in
+            MockOptionEODURLProtocol.handler = { req in
                 callCount += 1
                 let sym = symbols[(callCount - 1) % symbols.count]
                 return (quoteJSON(sym),
                         HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
                                         statusCode: 200, httpVersion: nil, headerFields: nil)!)
             }
-            URLProtocol.registerClass(MockURLProtocol.self)
             defer { unmockSchwab() }
 
             let activity = OptionEODPriceActivities(db: db, schwabClient: client, logger: Logger(label: "test"))
