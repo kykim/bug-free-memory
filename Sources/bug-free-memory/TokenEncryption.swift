@@ -2,9 +2,11 @@ import Crypto
 import Foundation
 import Vapor
 
-// SymmetricKey holds immutable SecureBytes and is safe to share across actor
-// boundaries, but swift-crypto does not yet declare Sendable conformance.
+// On Linux, swift-crypto does not declare Sendable for SymmetricKey, so we add it.
+// On Apple platforms, CryptoKit already declares it — guard against the duplicate warning.
+#if !canImport(Darwin)
 extension SymmetricKey: @retroactive @unchecked Sendable {}
+#endif
 
 enum TokenEncryption {
     enum EncryptionError: Error {
