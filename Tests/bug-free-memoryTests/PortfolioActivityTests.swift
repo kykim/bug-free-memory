@@ -15,15 +15,44 @@ import FluentSQLiteDriver
 import VaporTesting
 @testable import bug_free_memory
 
+// MARK: - Isolated mock protocol for PortfolioActivity tests
+
+final class MockPortfolioURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (Data, HTTPURLResponse))?
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = MockPortfolioURLProtocol.handler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unknown))
+            return
+        }
+        do {
+            let (data, response) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
 // MARK: - Test DB helper
 
 private func withPortfolioDB(
     _ body: (any Database, SchwabClient) async throws -> Void
 ) async throws {
     let key = SymmetricKey(size: .bits256)
+    let mockConfig = URLSessionConfiguration.ephemeral
+    mockConfig.protocolClasses = [MockPortfolioURLProtocol.self]
+    let mockSession = URLSession(configuration: mockConfig)
     let client = SchwabClient(
         accountNumber: "ACC123", clientID: "cid", clientSecret: "csecret",
-        encryptionKey: key, accessToken: "")
+        encryptionKey: key, accessToken: "", session: mockSession)
 
     try await withApp(configure: { app in
         app.databases.use(.sqlite(.memory), as: .sqlite)
@@ -84,16 +113,14 @@ private func makePositions(_ items: [(ticker: String, type: SchwabAssetType, osi
 }
 
 private func mockPositions(_ data: Data) {
-    MockURLProtocol.handler = { _ in
+    MockPortfolioURLProtocol.handler = { _ in
         (data, HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
                                statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
-    URLProtocol.registerClass(MockURLProtocol.self)
 }
 
 private func unmockPositions() {
-    URLProtocol.unregisterClass(MockURLProtocol.self)
-    MockURLProtocol.handler = nil
+    MockPortfolioURLProtocol.handler = nil
 }
 
 private func runActivity(db: any Database, client: SchwabClient, positions: Data) async throws -> FilteredPositionSet {

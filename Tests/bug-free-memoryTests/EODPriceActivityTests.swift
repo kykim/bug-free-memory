@@ -15,11 +15,37 @@ import TiingoKit
 import VaporTesting
 @testable import bug_free_memory
 
+// MARK: - Isolated mock protocol for EODPriceActivity / Tiingo tests
+
+final class MockTiingoURLProtocol: URLProtocol, @unchecked Sendable {
+    nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (Data, HTTPURLResponse))?
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = MockTiingoURLProtocol.handler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unknown))
+            return
+        }
+        do {
+            let (data, response) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+}
+
 // MARK: - DB helper
 
 private func withEODDB(_ body: (any Database, TiingoClient) async throws -> Void) async throws {
     let config = URLSessionConfiguration.ephemeral
-    config.protocolClasses = [MockURLProtocol.self]
+    config.protocolClasses = [MockTiingoURLProtocol.self]
     let session = URLSession(configuration: config)
     let tiingo = TiingoClient(apiKey: "test-key", session: session)
 
@@ -81,7 +107,7 @@ private func tiingoPriceJSON(date: String = "2026-03-13T00:00:00+00:00",
 
 private func mockTiingo(statusCode: Int = 200, body: Data,
                         forTicker ticker: String? = nil) {
-    MockURLProtocol.handler = { _ in
+    MockTiingoURLProtocol.handler = { _ in
         (body, HTTPURLResponse(url: URL(string: "https://api.tiingo.com")!,
                                statusCode: statusCode, httpVersion: nil, headerFields: nil)!)
     }
@@ -154,7 +180,7 @@ struct EODPriceActivityTests {
             // Return 404 for FAIL, 200 for AAPL — but MockURLProtocol applies to all requests,
             // so we test with a single instrument failing
             nonisolated(unsafe) var callCount = 0
-            MockURLProtocol.handler = { _ in
+            MockTiingoURLProtocol.handler = { _ in
                 callCount += 1
                 if callCount == 1 {
                     return (Data("not found".utf8),

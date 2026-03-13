@@ -45,18 +45,23 @@ final class SchwabClient: @unchecked Sendable {
     /// Current decrypted access token. Updated by refreshTokenIfNeeded.
     var accessToken: String
 
+    /// URLSession used for all HTTP requests. Injectable for testing.
+    let session: URLSession
+
     init(
         accountNumber: String,
         clientID: String,
         clientSecret: String,
         encryptionKey: SymmetricKey,
-        accessToken: String = ""
+        accessToken: String = "",
+        session: URLSession = .shared
     ) {
         self.accountNumber = accountNumber
         self.clientID = clientID
         self.clientSecret = clientSecret
         self.encryptionKey = encryptionKey
         self.accessToken = accessToken
+        self.session = session
     }
 
     // MARK: - Token Refresh
@@ -77,7 +82,7 @@ final class SchwabClient: @unchecked Sendable {
         let body = "grant_type=refresh_token&refresh_token=\(refreshToken)"
         request.httpBody = body.data(using: .utf8)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SchwabError.requestFailed(statusCode: 0)
         }
@@ -105,7 +110,7 @@ final class SchwabClient: @unchecked Sendable {
 
     /// Executes a request and returns decoded JSON. Throws SchwabError.authFailure on 401.
     func execute<T: Decodable>(_ request: URLRequest, as type: T.Type) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SchwabError.requestFailed(statusCode: 0)
         }
