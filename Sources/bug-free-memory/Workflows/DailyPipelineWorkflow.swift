@@ -12,9 +12,12 @@ import Temporal
 
 public struct DailyPipelineInput: Codable, Sendable {
     public let runDate: Date
+    /// Pre-computed by the schedule launcher; true when runDate is a recorded market holiday.
+    public let isHoliday: Bool
 
-    public init(runDate: Date) {
+    public init(runDate: Date, isHoliday: Bool = false) {
         self.runDate = runDate
+        self.isHoliday = isHoliday
     }
 }
 
@@ -35,8 +38,8 @@ public final class DailyPipelineWorkflow {
             )
         )
 
-        // 1. Short-circuit on market holiday
-        if MarketCalendar.isHoliday(runDate) {
+        // 1. Short-circuit on market holiday or weekend
+        if input.isHoliday || MarketCalendar.isWeekend(runDate) {
             let skipInput = RunLogInput(
                 runDate: runDate,
                 status: .skipped,
@@ -44,7 +47,7 @@ public final class DailyPipelineWorkflow {
                 eodResult: nil,
                 optionEODResult: nil,
                 pricingResult: nil,
-                errorMessages: ["Market holiday — pipeline skipped"],
+                errorMessages: [input.isHoliday ? "Market holiday — pipeline skipped" : "Weekend — pipeline skipped"],
                 startedAt: startedAt,
                 completedAt: Date()
             )
