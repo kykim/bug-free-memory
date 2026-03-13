@@ -87,6 +87,7 @@ public func configure(_ app: Application) async throws {
     )
     app.lifecycle.use(TemporalClientService(app: app))
     app.asyncCommands.use(WorkerCommand(), as: "worker")
+    app.asyncCommands.use(RegisterScheduleCommand(), as: "register-schedule")
 
     // register routes
     try app.register(collection: CurrencyController())
