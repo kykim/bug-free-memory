@@ -101,6 +101,7 @@ public func configure(_ app: Application) async throws {
     try app.register(collection: CorporateActionController())
     try app.register(collection: FREDYieldController())
     try app.register(collection: MarketHolidayController())
+    try app.register(collection: TemporalController())
     try routes(app)
 }
 

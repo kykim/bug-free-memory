@@ -33,6 +33,8 @@ nav a.active { color: var(--accent); background: var(--accent-dim); }
 .nav-dropdown-menu a { font-family: var(--mono); font-size: 11px; color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 4px; letter-spacing: 0.06em; transition: color 0.15s, background 0.15s; white-space: nowrap; }
 .nav-dropdown-menu a:hover { color: var(--text); background: var(--border); }
 .nav-dropdown-menu a.active { color: var(--accent); background: var(--accent-dim); }
+.nav-dropdown-item-btn { font-family: var(--mono); font-size: 11px; color: var(--muted); background: none; border: none; padding: 6px 12px; border-radius: 4px; letter-spacing: 0.06em; cursor: pointer; transition: color 0.15s, background 0.15s; white-space: nowrap; width: 100%; text-align: left; }
+.nav-dropdown-item-btn:hover { color: var(--text); background: var(--border); }
 
 /* ── Layout ── */
 main { max-width: 1100px; margin: 0 auto; padding: 40px 40px 80px; }
