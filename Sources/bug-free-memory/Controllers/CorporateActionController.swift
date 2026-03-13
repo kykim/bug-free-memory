@@ -32,7 +32,7 @@ struct CorporateActionController: RouteCollection {
         if let r = try req.validateContent(CreateCorporateActionDTO.self, redirectTo: "/corporate-actions") { return r }
         let input = try req.content.decode(CreateCorporateActionDTO.self)
         let exDate: Date
-        do { exDate = try input.parsedExDate() } catch let error as AbortError {
+        do { exDate = try input.parsedExDate() } catch let error as any AbortError {
             return req.flash(error.reason, type: "error", to: "/corporate-actions")
         }
         let action = CorporateAction(
@@ -57,7 +57,7 @@ struct CorporateActionController: RouteCollection {
         if let r = try req.validateContent(UpdateCorporateActionDTO.self, redirectTo: "/corporate-actions") { return r }
         let input = try req.content.decode(UpdateCorporateActionDTO.self)
         let exDate: Date
-        do { exDate = try input.parsedExDate() } catch let error as AbortError {
+        do { exDate = try input.parsedExDate() } catch let error as any AbortError {
             return req.flash(error.reason, type: "error", to: "/corporate-actions")
         }
         action.exDate     = exDate

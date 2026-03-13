@@ -2,6 +2,10 @@ import Crypto
 import Foundation
 import Vapor
 
+// SymmetricKey holds immutable SecureBytes and is safe to share across actor
+// boundaries, but swift-crypto does not yet declare Sendable conformance.
+extension SymmetricKey: @retroactive @unchecked Sendable {}
+
 enum TokenEncryption {
     enum EncryptionError: Error {
         case encryptionFailed
@@ -35,8 +39,15 @@ extension Application {
         typealias Value = SymmetricKey
     }
 
-    var tokenEncryptionKey: SymmetricKey {
-        get { storage[TokenEncryptionKeyStorage.self]! }
+    var tokenEncryptionKey: SymmetricKey? {
+        get { storage[TokenEncryptionKeyStorage.self] }
         set { storage[TokenEncryptionKeyStorage.self] = newValue }
+    }
+
+    func requireTokenEncryptionKey() throws -> SymmetricKey {
+        guard let key = tokenEncryptionKey else {
+            throw AppError.invalidEncryptionKeyConfig
+        }
+        return key
     }
 }

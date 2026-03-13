@@ -22,12 +22,13 @@ extension Application {
 
 // configures your application
 public func configure(_ app: Application) async throws {
-    guard let keyBase64 = Environment.get("TOKEN_ENCRYPTION_KEY"),
-          let keyData = Data(base64Encoded: keyBase64),
-          keyData.count == 32 else {
-        throw AppError.invalidEncryptionKeyConfig
+    if let keyBase64 = Environment.get("TOKEN_ENCRYPTION_KEY") {
+        guard let keyData = Data(base64Encoded: keyBase64), keyData.count == 32 else {
+            throw AppError.invalidEncryptionKeyConfig
+        }
+        app.tokenEncryptionKey = SymmetricKey(data: keyData)
     }
-    app.tokenEncryptionKey = SymmetricKey(data: keyData)
+    // Workers don't set TOKEN_ENCRYPTION_KEY and never call OAuth routes, so absence is fine.
 
     app.sessions.use(.memory)
 

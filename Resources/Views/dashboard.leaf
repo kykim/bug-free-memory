@@ -1,221 +1,184 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard — Market Data</title>
-    #clerkScript()
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-    <!-- Hide auth sections before Clerk loads to avoid flash -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.clerk-signed-in, .clerk-signed-out')
-            .forEach(function (el) { el.style.display = 'none'; });
-    });
-    </script>
+#extend("base"):
+#export("title"):Dashboard#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"): #endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_corp_actions"): #endexport
+#export("nav_fred_yields"): #endexport
 
-    <header>
-        <a class="logo" href="/">MarketData</a>
-        <div class="header-right">
-            <div class="clerk-signed-in">
-                <nav>
-                    <a href="/exchanges">Exchanges</a>
-                    <a href="/currencies">Currencies</a>
-                    <a href="/instruments">Instruments</a>
-                    <a href="/equities">Equities</a>
-                    <a href="/indexes">Indexes</a>
-                    <a href="/option-contracts">Options</a>
-                    <a href="/eod-prices">EOD Prices</a>
-                    <a href="/option-eod-prices">Option Prices</a>
-                    <a href="/corporate-actions">Corp Actions</a>
-                    <a href="/fred-yields">FRED Yields</a>
-                </nav>
-            </div>
-            <div class="clerk-signed-in">
-                <div id="clerk-user-button-nav"></div>
+#export("body"):
+<div class="dashboard-layout">
+    <div class="dashboard">
+
+        <!-- Signed out state -->
+        <div class="clerk-signed-out" style="display:none">
+            <div class="hero">
+                <div class="hero-label">Market Data</div>
+                <h1>Welcome back.</h1>
+                <p>Sign in to access the dashboard.</p>
+                <a class="hero-signin" href="/sign-in">Sign in →</a>
             </div>
         </div>
-    </header>
 
-    <main class="dashboard-layout">
-        <div class="dashboard">
+        <!-- Signed in state -->
+        <div class="clerk-signed-in">
 
-            <!-- Signed out state -->
-            <div class="clerk-signed-out">
-                <div class="hero">
-                    <div class="hero-label">Market Data</div>
-                    <h1>Welcome back.</h1>
-                    <p>Sign in to access the dashboard.</p>
-                    <a class="hero-signin" href="/sign-in">Sign in →</a>
+            <div class="profile-card">
+                <div class="profile-avatar">
+                    <img id="user-avatar" src="" alt="Profile photo" style="display:none" />
+                    <div id="user-avatar-initials" class="avatar-initials"></div>
+                </div>
+                <div class="profile-info">
+                    <div class="profile-name" id="user-full-name"></div>
+                    <div class="profile-email" id="user-email"></div>
+                    <div class="profile-username" id="user-username"></div>
+                    <div class="profile-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">User ID</span>
+                            <code id="user-id"></code>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">JWT</span>
+                            <pre id="user-jwt" style="font-size:0.7rem;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
+                        </div>
+                        <div class="meta-item" id="org-section" style="display:none">
+                            <span class="meta-label">Organisation</span>
+                            <span id="user-org"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Member since</span>
+                            <span id="user-created"></span>
+                        </div>
+                    </div>
+                    <a class="btn btn-ghost" href="/profile" style="margin-top:20px">Edit profile</a>
                 </div>
             </div>
 
-            <!-- Signed in state -->
-            <div class="clerk-signed-in">
-
-                <div class="profile-card">
-                    <div class="profile-avatar">
-                        <img id="user-avatar" src="" alt="Profile photo" style="display:none" />
-                        <div id="user-avatar-initials" class="avatar-initials"></div>
-                    </div>
-                    <div class="profile-info">
-                        <div class="profile-name" id="user-full-name"></div>
-                        <div class="profile-email" id="user-email"></div>
-                        <div class="profile-username" id="user-username"></div>
-                        <div class="profile-meta">
-                            <div class="meta-item">
-                                <span class="meta-label">User ID</span>
-                                <code id="user-id"></code>
-                            </div>
-                            <div class="meta-item">
-                                <span class="meta-label">JWT</span>
-                                <pre id="user-jwt" style="font-size:0.7rem;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
-                            </div>
-                            <div class="meta-item" id="org-section" style="display:none">
-                                <span class="meta-label">Organisation</span>
-                                <span id="user-org"></span>
-                            </div>
-                            <div class="meta-item">
-                                <span class="meta-label">Member since</span>
-                                <span id="user-created"></span>
-                            </div>
-                        </div>
-                        <a class="btn btn-ghost" href="/profile" style="margin-top:20px">Edit profile</a>
-                    </div>
-                </div>
-
-                <div class="dashboard-content">
-                    <div class="panel-label">Application</div>
-                    <p class="content-hint">Add your app content here.</p>
-                    <div class="panel-label" style="margin-top:24px">Integrations</div>
-                    #if(schwabConnected):
-                    <div class="insert-panel" style="margin-top:0.5rem">
-                        <div class="form-row">
-                            <div class="form-group fg-sm">
-                                <label>Schwab</label>
-                                <span class="badge badge-call">connected</span>
-                            </div>
-                        </div>
-                        #if(schwabTokenExpiresAt):
-                        <div class="form-row">
-                            <div class="form-group fg-sm">
-                                <label>Token Expires At</label>
-                                <code class="td-mono">#(schwabTokenExpiresAt)</code>
-                            </div>
-                        </div>
-                        #endif
-                        <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
-                            #if(schwabHasRefreshToken):
-                            <form method="POST" action="/schwab/refresh">
-                                <button type="submit" class="btn btn-ghost">Refresh →</button>
-                            </form>
-                            #endif
-                            <a class="btn btn-ghost" href="/schwab/login">Reconnect →</a>
+            <div class="dashboard-content">
+                <div class="panel-label">Application</div>
+                <p class="content-hint">Add your app content here.</p>
+                <div class="panel-label" style="margin-top:24px">Integrations</div>
+                #if(schwabConnected):
+                <div class="insert-panel" style="margin-top:0.5rem">
+                    <div class="form-row">
+                        <div class="form-group fg-sm">
+                            <label>Schwab</label>
+                            <span class="badge badge-call">connected</span>
                         </div>
                     </div>
-                    #else:
-                    <a class="btn" href="/schwab/login">Connect Schwab →</a>
+                    #if(schwabTokenExpiresAt):
+                    <div class="form-row">
+                        <div class="form-group fg-sm">
+                            <label>Token Expires At</label>
+                            <code class="td-mono" id="schwab-expires-at" data-utc="#(schwabTokenExpiresAt)"></code>
+                        </div>
+                    </div>
                     #endif
+                    <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                        #if(schwabHasRefreshToken):
+                        <form method="POST" action="/schwab/refresh">
+                            <button type="submit" class="btn btn-ghost">Refresh →</button>
+                        </form>
+                        #endif
+                        <a class="btn btn-ghost" href="/schwab/login">Reconnect →</a>
+                    </div>
                 </div>
-
+                #else:
+                <a class="btn" href="/schwab/login">Connect Schwab →</a>
+                #endif
             </div>
+
         </div>
-    </main>
+    </div>
+</div>
 
-    <script>
-    (async function () {
-        await new Promise(function (resolve) {
-            if (window.Clerk) { resolve(); return; }
-            var t = setInterval(function () {
-                if (window.Clerk) { clearInterval(t); resolve(); }
-            }, 50);
-        });
+<script>
+(async function () {
+    await new Promise(function (resolve) {
+        if (window.Clerk) { resolve(); return; }
+        var t = setInterval(function () {
+            if (window.Clerk) { clearInterval(t); resolve(); }
+        }, 50);
+    });
 
-        await window.Clerk.load();
+    await window.Clerk.load();
 
-        var signedIn  = document.querySelectorAll('.clerk-signed-in');
-        var signedOut = document.querySelectorAll('.clerk-signed-out');
+    var signedOut = document.querySelectorAll('.clerk-signed-out');
 
-        if (window.Clerk.user) {
-            signedIn.forEach(function (el)  { el.style.display = ''; });
-            signedOut.forEach(function (el) { el.style.display = 'none'; });
+    if (window.Clerk.user) {
+        signedOut.forEach(function (el) { el.style.display = 'none'; });
 
-            var navBtn = document.getElementById('clerk-user-button-nav');
-            if (navBtn) { window.Clerk.mountUserButton(navBtn); }
+        var user = window.Clerk.user;
 
-            var user = window.Clerk.user;
-
-            // Avatar
-            var img      = document.getElementById('user-avatar');
-            var initials = document.getElementById('user-avatar-initials');
-            if (user.imageUrl) {
-                img.src = user.imageUrl;
-                img.style.display = '';
-                initials.style.display = 'none';
-            } else {
-                var first = (user.firstName || '').charAt(0).toUpperCase();
-                var last  = (user.lastName  || '').charAt(0).toUpperCase();
-                initials.textContent = first + last || '?';
-            }
-
-            // Name & email
-            var fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
-            document.getElementById('user-full-name').textContent = fullName || 'No name set';
-
-            var primaryEmail = user.primaryEmailAddress;
-            document.getElementById('user-email').textContent =
-                primaryEmail ? primaryEmail.emailAddress : '';
-
-            if (user.username) {
-                document.getElementById('user-username').textContent = '@' + user.username;
-            }
-
-            document.getElementById('user-id').textContent = user.id;
-
-            // Decoded JWT
-            var jwtEl = document.getElementById('user-jwt');
-            if (jwtEl && window.Clerk.session) {
-                window.Clerk.session.getToken().then(function (token) {
-                    try {
-                        var payload = token.split('.')[1];
-                        var decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
-                        jwtEl.textContent = JSON.stringify(decoded, null, 2);
-                    } catch (e) {
-                        jwtEl.textContent = token;
-                    }
-                });
-            }
-
-            var org = window.Clerk.organization;
-            if (org) {
-                document.getElementById('user-org').textContent = org.name;
-                document.getElementById('org-section').style.display = '';
-            }
-
-            if (user.createdAt) {
-                document.getElementById('user-created').textContent =
-                    new Date(user.createdAt).toLocaleDateString(undefined, {
-                        year: 'numeric', month: 'long', day: 'numeric'
-                    });
-            }
-
-            var btn = document.getElementById('sign-out-btn');
-            if (btn) {
-                btn.addEventListener('click', async function () {
-                    await window.Clerk.signOut();
-                    window.location.reload();
-                });
-            }
+        // Avatar
+        var img      = document.getElementById('user-avatar');
+        var initials = document.getElementById('user-avatar-initials');
+        if (user.imageUrl) {
+            img.src = user.imageUrl;
+            img.style.display = '';
+            initials.style.display = 'none';
         } else {
-            signedIn.forEach(function (el)  { el.style.display = 'none'; });
-            signedOut.forEach(function (el) { el.style.display = ''; });
+            var first = (user.firstName || '').charAt(0).toUpperCase();
+            var last  = (user.lastName  || '').charAt(0).toUpperCase();
+            initials.textContent = first + last || '?';
         }
-    })();
-    </script>
-</body>
-</html>
+
+        // Name & email
+        var fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
+        document.getElementById('user-full-name').textContent = fullName || 'No name set';
+
+        var primaryEmail = user.primaryEmailAddress;
+        document.getElementById('user-email').textContent =
+            primaryEmail ? primaryEmail.emailAddress : '';
+
+        if (user.username) {
+            document.getElementById('user-username').textContent = '@' + user.username;
+        }
+
+        document.getElementById('user-id').textContent = user.id;
+
+        // Decoded JWT
+        var jwtEl = document.getElementById('user-jwt');
+        if (jwtEl && window.Clerk.session) {
+            window.Clerk.session.getToken().then(function (token) {
+                try {
+                    var payload = token.split('.')[1];
+                    var decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+                    jwtEl.textContent = JSON.stringify(decoded, null, 2);
+                } catch (e) {
+                    jwtEl.textContent = token;
+                }
+            });
+        }
+
+        var org = window.Clerk.organization;
+        if (org) {
+            document.getElementById('user-org').textContent = org.name;
+            document.getElementById('org-section').style.display = '';
+        }
+
+        if (user.createdAt) {
+            document.getElementById('user-created').textContent =
+                new Date(user.createdAt).toLocaleDateString(undefined, {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                });
+        }
+
+        var expiresEl = document.getElementById('schwab-expires-at');
+        if (expiresEl && expiresEl.dataset.utc) {
+            expiresEl.textContent = new Date(expiresEl.dataset.utc).toLocaleString(undefined, {
+                dateStyle: 'medium', timeStyle: 'short'
+            });
+        }
+    } else {
+        signedOut.forEach(function (el) { el.style.display = ''; });
+    }
+})();
+</script>
+#endexport
+#endextend

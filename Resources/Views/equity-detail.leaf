@@ -35,7 +35,8 @@
     <div class="page-title" style="font-size:1rem">EOD Prices<small>page #(page)</small></div>
     <div style="display:flex;gap:.5rem;align-items:center">
         <div class="row-count"><strong>#count(prices)</strong> records</div>
-        <form method="post" action="/equities/#(id)/fetch-today" style="margin:0">
+        <form method="post" action="/equities/#(id)/fetch-today" style="margin:0" onsubmit="injectLocalDate(this)">
+            <input type="hidden" name="local_date" value="">
             <button type="submit" class="btn btn-ghost">Fetch Today</button>
         </form>
         <form method="post" action="/equities/#(id)/backfill" style="margin:0">
@@ -77,5 +78,12 @@
     <a href="/equities/#(id)?page=#(nextPage)" class="btn btn-ghost">Older →</a>
     #endif
 </div>
+<script>
+function injectLocalDate(form) {
+    var d = new Date();
+    var local = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    form.querySelector('input[name="local_date"]').value = local;
+}
+</script>
 #endexport
 #endextend

@@ -34,72 +34,87 @@
 </div>
 
 <div class="page-header" style="margin-top:2rem">
-    <div class="page-title" style="font-size:1rem">Theoretical Prices<small>Black-Scholes, Binomial CRR &amp; Monte Carlo</small></div>
+    <div class="page-title" style="font-size:1rem">Prices<small>page #(page)</small></div>
     <form method="post" action="/option-contracts/#(id)/calculate-price">
         <button type="submit" class="btn btn-ghost">Calculate Price</button>
     </form>
 </div>
 
-#if(theoreticalPrices):
-<div class="table-wrap" style="margin-bottom:2rem">
-    <table>
-        <thead><tr><th>Model</th><th>Date</th><th>Und. Price</th><th>Price / Share</th><th>Hist. Vol</th><th>IV</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>Rho</th></tr></thead>
-        <tbody>
-        #for(p in theoreticalPrices):
-        <tr>
-            <td class="td-muted">#(p.model)</td>
-            <td class="td-mono">#(p.priceDate)</td>
-            <td class="td-mono">#(p.underlyingPrice)</td>
-            <td class="td-mono"><strong>#(p.price)</strong></td>
-            <td class="td-mono">#(p.historicalVolatility)</td>
-            <td class="td-mono">#(p.impliedVolatility)</td>
-            <td class="td-mono">#(p.delta)</td>
-            <td class="td-mono">#(p.gamma)</td>
-            <td class="td-mono">#(p.theta)</td>
-            <td class="td-mono">#(p.vega)</td>
-            <td class="td-mono">#(p.rho)</td>
-        </tr>
-        #endfor
-        </tbody>
-    </table>
-</div>
-#endif
-
-<div class="page-header" style="margin-top:2rem">
-    <div class="page-title" style="font-size:1rem">EOD Prices<small>page #(page)</small></div>
-    <div class="row-count"><strong>#count(prices)</strong> records</div>
-</div>
-
 <div class="table-wrap">
-    <table>
-        <thead><tr><th>Date</th><th>Bid</th><th>Ask</th><th>Mid</th><th>Last</th><th>Settle</th><th>Volume</th><th>OI</th><th>IV</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>Und. Price</th><th>Source</th></tr></thead>
-        <tbody>
-        #if(prices):
-            #for(p in prices):
+    <table id="prices-table">
+        <thead>
             <tr>
-                <td class="td-mono">#(p.priceDate)</td>
-                <td class="td-mono">#(p.bid)</td>
-                <td class="td-mono">#(p.ask)</td>
-                <td class="td-mono">#(p.mid)</td>
-                <td class="td-mono">#(p.last)</td>
-                <td class="td-mono">#(p.settlementPrice)</td>
-                <td class="td-muted">#(p.volume)</td>
-                <td class="td-muted">#(p.openInterest)</td>
-                <td class="td-mono">#(p.impliedVolatility)</td>
-                <td class="td-mono">#(p.delta)</td>
-                <td class="td-mono">#(p.gamma)</td>
-                <td class="td-mono">#(p.theta)</td>
-                <td class="td-mono">#(p.vega)</td>
-                <td class="td-mono">#(p.underlyingPrice)</td>
-                <td class="td-muted">#(p.source)</td>
+                <th>Date</th><th>Bid</th><th>Ask</th><th>Mid</th><th>Last</th><th>Settle</th><th>Volume</th><th>OI</th><th>IV</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>Und. Price</th><th>Source</th>
             </tr>
+        </thead>
+        <tbody>
+        #if(dateRows):
+            #for(row in dateRows):
+            <tr class="price-row#if(!row.hasEOD): price-row-empty#endif" data-date="#(row.priceDate)" onclick="toggleTheoretical(this)" style="cursor:pointer">
+                <td class="td-mono">#(row.priceDate)</td>
+                #if(row.hasEOD):
+                <td class="td-mono">#(row.bid)</td>
+                <td class="td-mono">#(row.ask)</td>
+                <td class="td-mono">#(row.mid)</td>
+                <td class="td-mono">#(row.last)</td>
+                <td class="td-mono">#(row.settlementPrice)</td>
+                <td class="td-muted">#(row.volume)</td>
+                <td class="td-muted">#(row.openInterest)</td>
+                <td class="td-mono">#(row.impliedVolatility)</td>
+                <td class="td-mono">#(row.delta)</td>
+                <td class="td-mono">#(row.gamma)</td>
+                <td class="td-mono">#(row.theta)</td>
+                <td class="td-mono">#(row.vega)</td>
+                <td class="td-mono">#(row.underlyingPrice)</td>
+                <td class="td-muted">#(row.source)</td>
+                #else:
+                <td colspan="14" class="td-muted">—</td>
+                #endif
+            </tr>
+            #if(row.theoreticalPrices):
+            <tr class="theoretical-row" data-date="#(row.priceDate)" style="display:none">
+                <td colspan="15" style="padding:0">
+                    <table class="theoretical-table">
+                        <thead>
+                            <tr><th>Model</th><th>Und. Price</th><th>Price / Share</th><th>Hist. Vol</th><th>IV</th><th>Delta</th><th>Gamma</th><th>Theta</th><th>Vega</th><th>Rho</th></tr>
+                        </thead>
+                        <tbody>
+                        #for(t in row.theoreticalPrices):
+                        <tr>
+                            <td class="td-muted">#(t.model)</td>
+                            <td class="td-mono">#(t.underlyingPrice)</td>
+                            <td class="td-mono"><strong>#(t.price)</strong></td>
+                            <td class="td-mono">#(t.historicalVolatility)</td>
+                            <td class="td-mono">#(t.impliedVolatility)</td>
+                            <td class="td-mono">#(t.delta)</td>
+                            <td class="td-mono">#(t.gamma)</td>
+                            <td class="td-mono">#(t.theta)</td>
+                            <td class="td-mono">#(t.vega)</td>
+                            <td class="td-mono">#(t.rho)</td>
+                        </tr>
+                        #endfor
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+            #endif
             #endfor
         #else:
-            <tr><td colspan="15"><div class="empty">No EOD price records found for this contract.</div></td></tr>
+            <tr><td colspan="15"><div class="empty">No price records found for this contract.</div></td></tr>
         #endif
         </tbody>
     </table>
 </div>
+
+<script>
+function toggleTheoretical(priceRow) {
+    var date = priceRow.dataset.date;
+    var next = priceRow.nextElementSibling;
+    if (next && next.classList.contains('theoretical-row') && next.dataset.date === date) {
+        next.style.display = next.style.display === 'none' ? '' : 'none';
+    }
+}
+</script>
 
 <div class="pagination">
     #if(page > 1):

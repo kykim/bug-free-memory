@@ -18,14 +18,13 @@ struct EODPriceService {
         logger.info("[eod-prices] started backfill workflow \(workflowID) for \(ticker)")
     }
 
-    /// Triggers a fetch for today's EOD price only.
-    func fetchToday(equityID: UUID, ticker: String) async throws {
-        let today = Calendar.current.startOfDay(for: Date())
+    /// Triggers a fetch for a specific date's EOD price only.
+    func fetchToday(equityID: UUID, ticker: String, date: Date) async throws {
         let workflowID = "fetch-today-\(equityID)-\(UUID())"
         _ = try await temporal.startWorkflow(
             type: UpdateEODPricesWorkflow.self,
             options: .init(id: workflowID, taskQueue: "eod-prices"),
-            input: UpdateEODPricesInput(equityID: equityID, ticker: ticker, startDate: today, endDate: today)
+            input: UpdateEODPricesInput(equityID: equityID, ticker: ticker, startDate: date, endDate: date)
         )
         logger.info("[eod-prices] started fetch-today workflow \(workflowID) for \(ticker)")
     }

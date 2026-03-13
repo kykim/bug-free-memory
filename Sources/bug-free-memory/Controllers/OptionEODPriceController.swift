@@ -32,7 +32,7 @@ struct OptionEODPriceController: RouteCollection {
         if let r = try req.validateContent(CreateOptionEODPriceDTO.self, redirectTo: "/option-eod-prices") { return r }
         let input = try req.content.decode(CreateOptionEODPriceDTO.self)
         let date: Date
-        do { date = try input.parsedPriceDate() } catch let error as AbortError {
+        do { date = try input.parsedPriceDate() } catch let error as any AbortError {
             return req.flash(error.reason, type: "error", to: "/option-eod-prices")
         }
         let price = OptionEODPrice(

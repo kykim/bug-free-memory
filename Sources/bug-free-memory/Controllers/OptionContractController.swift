@@ -55,7 +55,24 @@ struct OptionContractController: RouteCollection {
             .range((page - 1) * pageSize ..< page * pageSize)
             .all()
 
-        struct PriceRow: Encodable {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        df.timeZone = TimeZone(identifier: "UTC")
+
+        struct TheoreticalPriceRow: Encodable {
+            var model: String
+            var underlyingPrice: Double
+            var price: String
+            var historicalVolatility: String
+            var impliedVolatility: String?
+            var delta: String?
+            var gamma: String?
+            var theta: String?
+            var vega: String?
+            var rho: String?
+        }
+
+        struct DateRow: Encodable {
             var priceDate: String
             var bid: Double?
             var ask: Double?
@@ -71,37 +88,8 @@ struct OptionContractController: RouteCollection {
             var vega: Double?
             var underlyingPrice: Double?
             var source: String?
-        }
-
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        df.timeZone = TimeZone(identifier: "UTC")
-
-        let priceRows = prices.map { p in
-            PriceRow(
-                priceDate: df.string(from: p.priceDate),
-                bid: p.bid, ask: p.ask, mid: p.mid, last: p.last,
-                settlementPrice: p.settlementPrice,
-                volume: p.volume, openInterest: p.openInterest,
-                impliedVolatility: p.impliedVolatility,
-                delta: p.delta, gamma: p.gamma, theta: p.theta, vega: p.vega,
-                underlyingPrice: p.underlyingPrice,
-                source: p.source
-            )
-        }
-
-        struct TheoreticalPriceRow: Encodable {
-            var model: String
-            var priceDate: String
-            var underlyingPrice: Double
-            var price: Double
-            var historicalVolatility: Double
-            var impliedVolatility: Double?
-            var delta: Double?
-            var gamma: Double?
-            var theta: Double?
-            var vega: Double?
-            var rho: Double?
+            var hasEOD: Bool
+            var theoreticalPrices: [TheoreticalPriceRow]
         }
 
         let theoreticalPrices = try await TheoreticalOptionEODPrice.query(on: req.db)
@@ -109,21 +97,54 @@ struct OptionContractController: RouteCollection {
             .sort(\.$priceDate, .descending)
             .all()
 
-        let theoreticalPriceRows = theoreticalPrices.map { t in
-            TheoreticalPriceRow(
+        // Group theoretical prices by date string
+        var theoreticalByDate: [String: [TheoreticalPriceRow]] = [:]
+        for t in theoreticalPrices {
+            let dateStr = df.string(from: t.priceDate)
+            let row = TheoreticalPriceRow(
                 model: t.modelDetail ?? t.model.rawValue,
-                priceDate: df.string(from: t.priceDate),
                 underlyingPrice: t.underlyingPrice,
-                price: t.price,
-                historicalVolatility: t.historicalVolatility,
-                impliedVolatility: t.impliedVolatility,
-                delta: t.delta,
-                gamma: t.gamma,
-                theta: t.theta,
-                vega: t.vega,
-                rho: t.rho
+                price: String(format: "%.2f", t.price),
+                historicalVolatility: String(format: "%.5f", t.historicalVolatility),
+                impliedVolatility: t.impliedVolatility.map { String(format: "%.5f", $0) },
+                delta: t.delta.map { String(format: "%.5f", $0) },
+                gamma: t.gamma.map { String(format: "%.5f", $0) },
+                theta: t.theta.map { String(format: "%.5f", $0) },
+                vega: t.vega.map { String(format: "%.5f", $0) },
+                rho: t.rho.map { String(format: "%.5f", $0) }
+            )
+            theoreticalByDate[dateStr, default: []].append(row)
+        }
+
+        // Build merged rows: start with EOD prices, then add theoretical-only dates
+        var dateRows: [DateRow] = prices.map { p in
+            let dateStr = df.string(from: p.priceDate)
+            return DateRow(
+                priceDate: dateStr,
+                bid: p.bid, ask: p.ask, mid: p.mid, last: p.last,
+                settlementPrice: p.settlementPrice,
+                volume: p.volume, openInterest: p.openInterest,
+                impliedVolatility: p.impliedVolatility,
+                delta: p.delta, gamma: p.gamma, theta: p.theta, vega: p.vega,
+                underlyingPrice: p.underlyingPrice,
+                source: p.source,
+                hasEOD: true,
+                theoreticalPrices: theoreticalByDate[dateStr] ?? []
             )
         }
+
+        let eodDates = Set(dateRows.map(\.priceDate))
+        let theoreticalOnlyDates = theoreticalByDate.keys
+            .filter { !eodDates.contains($0) }
+            .sorted(by: >)
+        for dateStr in theoreticalOnlyDates {
+            dateRows.append(DateRow(
+                priceDate: dateStr,
+                hasEOD: false,
+                theoreticalPrices: theoreticalByDate[dateStr] ?? []
+            ))
+        }
+        dateRows.sort { $0.priceDate > $1.priceDate }
 
         let (flash, flashType) = req.popFlash()
         struct Context: Encodable {
@@ -136,8 +157,7 @@ struct OptionContractController: RouteCollection {
             var expirationDate: String
             var contractMultiplier: Double
             var settlementType: String
-            var theoreticalPrices: [TheoreticalPriceRow]
-            var prices: [PriceRow]
+            var dateRows: [DateRow]
             var page: Int
             var prevPage: Int
             var nextPage: Int
@@ -156,8 +176,7 @@ struct OptionContractController: RouteCollection {
             expirationDate: df.string(from: contract.expirationDate),
             contractMultiplier: contract.contractMultiplier,
             settlementType: contract.settlementType,
-            theoreticalPrices: theoreticalPriceRows,
-            prices: priceRows,
+            dateRows: dateRows,
             page: page,
             prevPage: page - 1,
             nextPage: page + 1,
@@ -196,7 +215,7 @@ struct OptionContractController: RouteCollection {
         if let r = try req.validateContent(CreateOptionContractDTO.self, redirectTo: "/option-contracts") { return r }
         let input = try req.content.decode(CreateOptionContractDTO.self)
         let expDate: Date
-        do { expDate = try input.parsedExpirationDate() } catch let error as AbortError {
+        do { expDate = try input.parsedExpirationDate() } catch let error as any AbortError {
             return req.flash(error.reason, type: "error", to: "/option-contracts")
         }
         let contract = OptionContract(
@@ -223,7 +242,7 @@ struct OptionContractController: RouteCollection {
         if let r = try req.validateContent(UpdateOptionContractDTO.self, redirectTo: "/option-contracts/\(id)") { return r }
         let input = try req.content.decode(UpdateOptionContractDTO.self)
         let expDate: Date
-        do { expDate = try input.parsedExpirationDate() } catch let error as AbortError {
+        do { expDate = try input.parsedExpirationDate() } catch let error as any AbortError {
             return req.flash(error.reason, type: "error", to: "/option-contracts/\(id)")
         }
         contract.strikePrice = input.strike_price

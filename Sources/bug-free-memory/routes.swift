@@ -108,7 +108,7 @@ func routes(_ app: Application) throws {
 
         let token = try tokenResponse.content.decode(SchwabTokenResponse.self)
         let tokenExpiresAt = Date().addingTimeInterval(TimeInterval(token.expiresIn))
-        let key = req.application.tokenEncryptionKey
+        let key = try req.application.requireTokenEncryptionKey()
         let encryptedAccess = try TokenEncryption.encrypt(token.accessToken, key: key)
         let encryptedRefresh = try token.refreshToken.map { try TokenEncryption.encrypt($0, key: key) }
 
@@ -146,7 +146,7 @@ func routes(_ app: Application) throws {
         guard let encryptedRefreshToken = existing.refreshToken else {
             throw AppError.oauthNoRefreshToken
         }
-        let key = req.application.tokenEncryptionKey
+        let key = try req.application.requireTokenEncryptionKey()
         let refreshToken = try TokenEncryption.decrypt(encryptedRefreshToken, key: key)
 
         let clientID = Environment.get("SCHWAB_CLIENT_ID") ?? ""

@@ -214,7 +214,16 @@ struct EquityController: RouteCollection {
             return req.flash("Equity not found.", type: "error", to: "/equities")
         }
         let ticker = try equity.joined(Instrument.self).ticker
-        try await req.eodPriceService.fetchToday(equityID: id, ticker: ticker)
+        struct FetchTodayForm: Content { var local_date: String? }
+        let form = try req.content.decode(FetchTodayForm.self)
+        let today: Date
+        if let dateStr = form.local_date,
+           let parsed = { let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = .current; return df }().date(from: dateStr) {
+            today = parsed
+        } else {
+            today = Calendar.current.startOfDay(for: Date())
+        }
+        try await req.eodPriceService.fetchToday(equityID: id, ticker: ticker, date: today)
         return req.flash("Today's EOD price fetch started for \(ticker).", type: "success", to: "/equities/\(id.uuidString)")
     }
 }

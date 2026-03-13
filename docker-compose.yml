@@ -25,6 +25,7 @@ x-shared_environment: &shared_environment
   NGROK_AUTH_TOKEN: ${NGROK_AUTH_TOKEN}
   NGROK_DOMAIN: ${NGROK_DOMAIN}
   FRED_API_KEY: ${FRED_API_KEY}
+  TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
   
 services:
   app:
