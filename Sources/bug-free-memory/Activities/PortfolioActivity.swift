@@ -12,27 +12,20 @@ import Logging
 import Temporal
 
 @ActivityContainer
-public struct PortfolioActivities {
+struct PortfolioActivities {
 
     private let db: any Database
     private let schwabClient: SchwabClient
     private let logger: Logger
 
-    public init(db: any Database, schwabClient: SchwabClient, logger: Logger) {
+    init(db: any Database, schwabClient: SchwabClient, logger: Logger) {
         self.db = db
         self.schwabClient = schwabClient
         self.logger = logger
     }
 
-    @Activity(
-        retryPolicy: RetryPolicy(
-            initialInterval: .seconds(30),
-            backoffCoefficient: 2.0,
-            maximumAttempts: 3
-        ),
-        scheduleToCloseTimeout: .seconds(300)
-    )
-    public func fetchPortfolioPositions(runDate: Date) async throws -> FilteredPositionSet {
+    @Activity
+    func fetchPortfolioPositions(runDate: Date) async throws -> FilteredPositionSet {
         let start = Date()
         logger.info("[PortfolioActivity] starting for runDate=\(runDate)")
 
