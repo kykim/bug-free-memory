@@ -14,25 +14,18 @@ import Logging
 import Temporal
 
 @ActivityContainer
-public struct RunLogActivities {
+struct RunLogActivities {
 
     private let db: any Database
     private let logger: Logger
 
-    public init(db: any Database, logger: Logger) {
+    init(db: any Database, logger: Logger) {
         self.db = db
         self.logger = logger
     }
 
-    @Activity(
-        retryPolicy: RetryPolicy(
-            initialInterval: .seconds(5),
-            backoffCoefficient: 1.5,
-            maximumAttempts: 5
-        ),
-        scheduleToCloseTimeout: .seconds(60)
-    )
-    public func writeRunLog(input: RunLogInput) async throws {
+    @Activity
+    func writeRunLog(input: RunLogInput) async throws {
         let completedAt = Date()
 
         // Derive human-readable array fields
