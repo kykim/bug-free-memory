@@ -22,7 +22,7 @@ enum SchwabError: Error {
 
 // MARK: - Token refresh response
 
-private struct SchwabTokenResponse: Decodable {
+private struct SchwabOAuthTokenResponse: Decodable {
     let access_token: String
     let refresh_token: String?
     let expires_in: Int
@@ -87,7 +87,7 @@ final class SchwabClient: @unchecked Sendable {
         }
 
         do {
-            let tokenResponse = try JSONDecoder().decode(SchwabTokenResponse.self, from: data)
+            let tokenResponse = try JSONDecoder().decode(SchwabOAuthTokenResponse.self, from: data)
             return (tokenResponse.access_token, tokenResponse.refresh_token, tokenResponse.expires_in)
         } catch {
             throw SchwabError.decodingFailed(error)
