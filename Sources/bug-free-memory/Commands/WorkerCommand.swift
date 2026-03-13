@@ -36,6 +36,11 @@ struct WorkerCommand: AsyncCommand {
                 }
             }
             group.addTask {
+                await withRetry(label: "daily-pipeline-worker", logger: logger) {
+                    try await startDailyPipelineWorker(app: app)
+                }
+            }
+            group.addTask {
                 await withRetry(label: "greeting-worker", logger: logger) {
                     let worker = try TemporalWorker(
                         configuration: .init(
