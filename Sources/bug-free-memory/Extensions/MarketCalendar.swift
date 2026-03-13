@@ -11,7 +11,7 @@ import Foundation
 
 enum MarketCalendar {
 
-    private static var calendar: Calendar = {
+    private static let calendar: Calendar = {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "America/New_York")!
         return cal

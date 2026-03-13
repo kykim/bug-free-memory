@@ -18,6 +18,7 @@ let package = Package(
         .package(url: "https://github.com/kykim/clerk-vapor.git", from: "0.0.6"),
         .package(url: "https://github.com/kykim/tiingo-kit.git", from: "0.0.2"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+        .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -42,6 +43,7 @@ let package = Package(
             dependencies: [
                 .target(name: "bug-free-memory"),
                 .product(name: "VaporTesting", package: "vapor"),
+                .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
             ],
             swiftSettings: swiftSettings
         )
