@@ -56,15 +56,15 @@ struct RegisterScheduleCommand: AsyncCommand {
             let todayStr = Self.workflowIDDateFormatter.string(from: Date())
 
             // Calendar spec: 4 PM ET, weekdays only (Mon–Fri)
-            let calendarSpec = Schedule.SpecCalendar(
-                minute:     [.init(value: 0)],
-                hour:       [.init(value: 16)],
-                dayOfWeek:  [
-                    .init(value: 1), // Monday
-                    .init(value: 2), // Tuesday
-                    .init(value: 3), // Wednesday
-                    .init(value: 4), // Thursday
-                    .init(value: 5), // Friday
+            let calendarSpec = ScheduleCalendarSpecification(
+                minute:    [ScheduleRange(value: 0)],
+                hour:      [ScheduleRange(value: 16)],
+                dayOfWeek: [
+                    ScheduleRange(value: 1), // Monday
+                    ScheduleRange(value: 2), // Tuesday
+                    ScheduleRange(value: 3), // Wednesday
+                    ScheduleRange(value: 4), // Thursday
+                    ScheduleRange(value: 5), // Friday
                 ]
             )
 
@@ -79,7 +79,7 @@ struct RegisterScheduleCommand: AsyncCommand {
                         input: DailyPipelineInput(runDate: Date())
                     )
                 ),
-                specification: .init(
+                specification: ScheduleSpecification(
                     calendars: [calendarSpec],
                     timeZoneName: "America/New_York"
                 )
