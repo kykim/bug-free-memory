@@ -14,27 +14,20 @@ import Temporal
 import TiingoKit
 
 @ActivityContainer
-public struct EODPriceActivities {
+struct EODPriceActivities {
 
     private let db: any Database
     private let tiingoClient: TiingoClient
     private let logger: Logger
 
-    public init(db: any Database, tiingoClient: TiingoClient, logger: Logger) {
+    init(db: any Database, tiingoClient: TiingoClient, logger: Logger) {
         self.db = db
         self.tiingoClient = tiingoClient
         self.logger = logger
     }
 
-    @Activity(
-        retryPolicy: RetryPolicy(
-            initialInterval: .seconds(30),
-            backoffCoefficient: 2.0,
-            maximumAttempts: 3
-        ),
-        scheduleToCloseTimeout: .seconds(300)
-    )
-    public func fetchAndUpsertEODPrices(runDate: Date) async throws -> EODPriceResult {
+    @Activity
+    func fetchAndUpsertEODPrices(runDate: Date) async throws -> EODPriceResult {
         // 1. Resolve all active equity and index instrument IDs
         let equityIDs = try await Equity.query(on: db).all().map { $0.id! }
         let indexIDs  = try await Index.query(on: db).all().map { $0.id! }
