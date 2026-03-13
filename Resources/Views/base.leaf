@@ -22,16 +22,22 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="header-right">
         <div class="clerk-signed-in">
             <nav>
-                <a href="/exchanges"         class="#import("nav_exchanges")"        >Exchanges</a>
-                <a href="/currencies"        class="#import("nav_currencies")"       >Currencies</a>
-                <a href="/instruments"       class="#import("nav_instruments")"      >Instruments</a>
-                <a href="/equities"          class="#import("nav_equities")"         >Equities</a>
-                <a href="/indexes"           class="#import("nav_indexes")"          >Indexes</a>
-                <a href="/option-contracts"  class="#import("nav_option_contracts")" >Options</a>
-                <a href="/eod-prices"        class="#import("nav_eod_prices")"       >EOD Prices</a>
-                <a href="/option-eod-prices" class="#import("nav_option_eod")"       >Option Prices</a>
-                <a href="/corporate-actions" class="#import("nav_corp_actions")"     >Corp Actions</a>
-                <a href="/fred-yields"       class="#import("nav_fred_yields")"      >FRED Yields</a>
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn #import("nav_data_active")">Data ▾</button>
+                    <div class="nav-dropdown-menu">
+                        <a href="/exchanges"         class="#import("nav_exchanges")"        >Exchanges</a>
+                        <a href="/currencies"        class="#import("nav_currencies")"       >Currencies</a>
+                        <a href="/instruments"       class="#import("nav_instruments")"      >Instruments</a>
+                        <a href="/equities"          class="#import("nav_equities")"         >Equities</a>
+                        <a href="/indexes"           class="#import("nav_indexes")"          >Indexes</a>
+                        <a href="/option-contracts"  class="#import("nav_option_contracts")" >Options</a>
+                        <a href="/eod-prices"        class="#import("nav_eod_prices")"       >EOD Prices</a>
+                        <a href="/option-eod-prices" class="#import("nav_option_eod")"       >Option Prices</a>
+                        <a href="/corporate-actions" class="#import("nav_corp_actions")"     >Corp Actions</a>
+                        <a href="/fred-yields"       class="#import("nav_fred_yields")"      >FRED Yields</a>
+                        <a href="/market-holidays"   class="#import("nav_market_holidays")"  >Market Holidays</a>
+                    </div>
+                </div>
             </nav>
         </div>
         <div class="clerk-signed-in">
@@ -42,6 +48,22 @@ document.addEventListener('DOMContentLoaded', function () {
 <main>
     #import("body")
 </main>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.nav-dropdown-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var dd = btn.closest('.nav-dropdown');
+                dd.classList.toggle('open');
+            });
+        });
+        document.addEventListener('click', function () {
+            document.querySelectorAll('.nav-dropdown.open').forEach(function (dd) {
+                dd.classList.remove('open');
+            });
+        });
+    });
+</script>
 <script>
     function showEdit(id) {
         document.getElementById('row-' + id).style.display = 'none';

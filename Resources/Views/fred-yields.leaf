@@ -10,6 +10,8 @@
 #export("nav_option_eod"): #endexport
 #export("nav_corp_actions"): #endexport
 #export("nav_fred_yields"):active#endexport
+#export("nav_market_holidays"): #endexport
+#export("nav_data_active"):active#endexport
 
 #export("body"):
 #if(flash):

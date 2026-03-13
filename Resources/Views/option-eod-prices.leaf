@@ -8,6 +8,9 @@
 #export("nav_option_contracts"): #endexport
 #export("nav_eod_prices"): #endexport
 #export("nav_option_eod"):active#endexport
+#export("nav_fred_yields"): #endexport
+#export("nav_market_holidays"): #endexport
+#export("nav_data_active"):active#endexport
 #export("nav_corp_actions"): #endexport
 
 #export("body"):

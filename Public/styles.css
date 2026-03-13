@@ -24,6 +24,15 @@ nav { display: flex; gap: 2px; }
 nav a { font-family: var(--mono); font-size: 11px; color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 4px; letter-spacing: 0.06em; transition: color 0.15s, background 0.15s; }
 nav a:hover { color: var(--text); background: var(--border); }
 nav a.active { color: var(--accent); background: var(--accent-dim); }
+.nav-dropdown { position: relative; }
+.nav-dropdown-btn { font-family: var(--mono); font-size: 11px; color: var(--muted); background: none; border: none; padding: 6px 12px; border-radius: 4px; letter-spacing: 0.06em; cursor: pointer; transition: color 0.15s, background 0.15s; }
+.nav-dropdown-btn:hover, .nav-dropdown.open .nav-dropdown-btn { color: var(--text); background: var(--border); }
+.nav-dropdown-btn.active { color: var(--accent); background: var(--accent-dim); }
+.nav-dropdown-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px; min-width: 160px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.nav-dropdown.open .nav-dropdown-menu { display: flex; flex-direction: column; }
+.nav-dropdown-menu a { font-family: var(--mono); font-size: 11px; color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 4px; letter-spacing: 0.06em; transition: color 0.15s, background 0.15s; white-space: nowrap; }
+.nav-dropdown-menu a:hover { color: var(--text); background: var(--border); }
+.nav-dropdown-menu a.active { color: var(--accent); background: var(--accent-dim); }
 
 /* ── Layout ── */
 main { max-width: 1100px; margin: 0 auto; padding: 40px 40px 80px; }
