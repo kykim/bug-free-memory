@@ -56,6 +56,7 @@ public func configure(_ app: Application) async throws {
     app.migrations.add(CreateTheoreticalOptionEODPrice())
     app.migrations.add(CreateFREDYield())
     app.migrations.add(CreateOAuthToken())
+    app.migrations.add(CreateJobRuns())
 
     try await app.autoMigrate()
 
