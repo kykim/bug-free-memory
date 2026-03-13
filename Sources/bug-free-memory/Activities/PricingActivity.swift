@@ -22,25 +22,18 @@ enum PricingError: Error {
 // MARK: - Activity
 
 @ActivityContainer
-public struct PricingActivities {
+struct PricingActivities {
 
     private let db: any Database
     private let logger: Logger
 
-    public init(db: any Database, logger: Logger) {
+    init(db: any Database, logger: Logger) {
         self.db = db
         self.logger = logger
     }
 
-    @Activity(
-        retryPolicy: RetryPolicy(
-            initialInterval: .seconds(10),
-            backoffCoefficient: 1.5,
-            maximumAttempts: 2
-        ),
-        scheduleToCloseTimeout: .seconds(1800)
-    )
-    public func priceAllContracts(runDate: Date) async throws -> PricingResult {
+    @Activity
+    func priceAllContracts(runDate: Date) async throws -> PricingResult {
         // 1. Load yield curve — abort early if empty
         let yieldCurve = try await YieldCurve.load(db: db, runDate: runDate)
         guard !yieldCurve.points.isEmpty else {
@@ -113,11 +106,11 @@ public struct PricingActivities {
         }
 
         // a. Fetch today's OptionEODPrice
-        guard let optionEOD = try? await OptionEODPrice.query(on: db)
+        let optionEODOptional = try? await OptionEODPrice.query(on: db)
             .filter(\.$instrument.$id == instrumentID)
             .filter(\.$priceDate == startOfDay)
-            .first(),
-            optionEOD != nil else {
+            .first()
+        guard let optionEOD = optionEODOptional ?? nil else {
             return .failure(FailedContract(instrumentID: instrumentID, reason: "no_eod_price_today"))
         }
 
@@ -149,7 +142,7 @@ public struct PricingActivities {
                 priceDate: startOfDay, riskFreeRate: r,
                 pricingModel: .blackScholes, source: "calculated"
             )
-            record.impliedVolatility = optionEOD!.impliedVolatility
+            record.impliedVolatility = optionEOD.impliedVolatility
             if (try? await upsert(record: record, on: sqlDB)) != nil { rowsUpserted += 1 }
         }
 
@@ -161,7 +154,7 @@ public struct PricingActivities {
                 priceDate: startOfDay, riskFreeRate: r,
                 pricingModel: .binomial, source: "calculated"
             )
-            record.impliedVolatility = optionEOD!.impliedVolatility
+            record.impliedVolatility = optionEOD.impliedVolatility
             if (try? await upsert(record: record, on: sqlDB)) != nil { rowsUpserted += 1 }
         }
 
@@ -173,7 +166,7 @@ public struct PricingActivities {
                 result: mcResult, instrumentID: instrumentID,
                 priceDate: startOfDay, riskFreeRate: r, source: "calculated"
             )
-            record.impliedVolatility = optionEOD!.impliedVolatility
+            record.impliedVolatility = optionEOD.impliedVolatility
             if (try? await upsert(record: record, on: sqlDB)) != nil { rowsUpserted += 1 }
         }
 
@@ -187,7 +180,7 @@ public struct PricingActivities {
     // MARK: - Private: upsert one theoretical price
 
     private func upsert(record: TheoreticalOptionEODPrice, on sqlDB: any SQLDatabase) async throws {
-        guard let instrumentID = record.$instrument.id else { return }
+        let instrumentID = record.$instrument.id
         let newID = UUID()
         let modelStr = record.model.rawValue
 

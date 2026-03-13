@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct FailedContract: Codable, Sendable {
+struct FailedContract: Codable, Sendable, Error {
     let instrumentID: UUID
     let reason: String
 }
