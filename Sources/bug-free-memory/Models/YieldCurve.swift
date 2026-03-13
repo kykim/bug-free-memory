@@ -24,13 +24,6 @@ struct YieldCurve: Sendable {
 
     /// Loads the most recent yield curve on or before runDate from fred_yields.
     static func load(db: any Database, runDate: Date) async throws -> YieldCurve {
-        // Find MAX(observation_date) <= runDate
-        let sqlDB = db as! any SQLDatabase
-
-        struct DateRow: Decodable {
-            let observation_date: Date?
-        }
-
         // Use Fluent query to find the max observation date on or before runDate
         let row = try await FREDYield.query(on: db)
             .filter(\.$observationDate <= runDate)
