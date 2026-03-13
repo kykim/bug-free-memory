@@ -44,6 +44,7 @@ public func configure(_ app: Application) async throws {
     )
 
     // Register migrations
+    app.migrations.add(CreateMarketHolidays())   // no deps
     app.migrations.add(CreateCurrencies())       // no deps
     app.migrations.add(CreateExchanges())        // no deps
     app.migrations.add(CreateInstruments())      // depends on currencies, exchanges
