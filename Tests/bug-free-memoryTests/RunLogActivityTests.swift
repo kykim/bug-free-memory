@@ -72,6 +72,7 @@ private func minimalInput(
         status: status,
         portfolioResult: nil,
         eodResult: nil,
+        indexEODResult: nil,
         optionEODResult: nil,
         pricingResult: nil,
         errorMessages: errorMessages,
@@ -106,13 +107,13 @@ struct RunLogActivityTests {
 
             try await activity.writeRunLog(input: RunLogInput(
                 runDate: runDate, status: .success,
-                portfolioResult: nil, eodResult: nil, optionEODResult: nil, pricingResult: nil,
+                portfolioResult: nil, eodResult: nil, indexEODResult: nil, optionEODResult: nil, pricingResult: nil,
                 errorMessages: [], startedAt: originalStart, completedAt: Date()
             ))
 
             try await activity.writeRunLog(input: RunLogInput(
                 runDate: runDate, status: .partial,
-                portfolioResult: nil, eodResult: nil, optionEODResult: nil, pricingResult: nil,
+                portfolioResult: nil, eodResult: nil, indexEODResult: nil, optionEODResult: nil, pricingResult: nil,
                 errorMessages: ["something failed"], startedAt: Date(), completedAt: Date()
             ))
 

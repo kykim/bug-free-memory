@@ -282,19 +282,19 @@ struct OptionContractController: RouteCollection {
         }
         do {
             try await schwab.refreshTokenIfNeeded(db: req.db)
-            guard let quote = try await schwab.fetchOptionQuote(osiSymbol: osiSymbol) else {
+            guard let quote = try await schwab.fetchOptionEODPrice(osiSymbol: osiSymbol) else {
                 return req.flash("No quote returned for \(osiSymbol).", type: "error", to: "/option-contracts/\(id)")
             }
-            let iv = quote.volatility.map { $0 / 100.0 }
+            let iv = quote.impliedVolatility.map { $0 / 100.0 }
             if let existing = try await OptionEODPrice.query(on: req.db)
                 .filter(\.$instrument.$id == id)
                 .filter(\.$priceDate == priceDate)
                 .first() {
-                existing.bid              = quote.bidPrice
-                existing.ask              = quote.askPrice
-                existing.last             = quote.lastPrice
+                existing.bid              = quote.bid
+                existing.ask              = quote.ask
+                existing.last             = quote.last
                 existing.settlementPrice  = quote.closePrice
-                existing.volume           = quote.totalVolume
+                existing.volume           = quote.volume
                 existing.openInterest     = quote.openInterest
                 existing.impliedVolatility = iv
                 existing.delta            = quote.delta
@@ -308,8 +308,8 @@ struct OptionContractController: RouteCollection {
             } else {
                 try await OptionEODPrice(
                     instrumentID: id, priceDate: priceDate,
-                    bid: quote.bidPrice, ask: quote.askPrice, last: quote.lastPrice,
-                    settlementPrice: quote.closePrice, volume: quote.totalVolume,
+                    bid: quote.bid, ask: quote.ask, last: quote.last,
+                    settlementPrice: quote.closePrice, volume: quote.volume,
                     openInterest: quote.openInterest, impliedVolatility: iv,
                     delta: quote.delta, gamma: quote.gamma, theta: quote.theta,
                     vega: quote.vega, rho: quote.rho, underlyingPrice: quote.underlyingPrice,

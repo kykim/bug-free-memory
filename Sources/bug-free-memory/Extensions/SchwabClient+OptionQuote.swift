@@ -11,21 +11,28 @@ import Foundation
 // MARK: - Types
 
 struct SchwabOptionQuote: Decodable {
-    let bidPrice: Double?
-    let askPrice: Double?
-    let lastPrice: Double?
+    let bid: Double?
+    let ask: Double?
+    let last: Double?
     let closePrice: Double?
     let mark: Double?
-    let totalVolume: Int?
+    let volume: Int?
     let openInterest: Int?
     /// Implied volatility as a percentage (e.g. 32.75 = 32.75%). Divide by 100 before storing.
-    let volatility: Double?
+    /// Schwab's JSON key is "volatility".
+    let impliedVolatility: Double?
     let delta: Double?
     let gamma: Double?
     let theta: Double?
     let vega: Double?
     let rho: Double?
     let underlyingPrice: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case bid, ask, last, closePrice, mark, volume, openInterest
+        case impliedVolatility = "volatility"
+        case delta, gamma, theta, vega, rho, underlyingPrice
+    }
 }
 
 // MARK: - Extension
@@ -34,7 +41,7 @@ extension SchwabClient {
 
     /// Fetches a real-time quote for the given OSI option symbol.
     /// Returns nil if the symbol is absent from the response (e.g. expired contract).
-    func fetchOptionQuote(osiSymbol: String) async throws -> SchwabOptionQuote? {
+    func fetchOptionEODPrice(osiSymbol: String) async throws -> SchwabOptionQuote? {
         guard let encoded = osiSymbol.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "\(Self.marketDataBaseURL)/quotes?symbols=\(encoded)&fields=quote,fundamental,reference&indicative=false") else {
             throw SchwabError.requestFailed(statusCode: 0)

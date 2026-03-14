@@ -42,8 +42,8 @@ struct PricingActivities {
         }
 
         // 2. Query non-expired contracts with their underlying
-        let startOfDay = Calendar.current.startOfDay(for: runDate)
-        let endOfDay   = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)!
+        let startOfDay = Calendar.utc.startOfDay(for: runDate)
+        let endOfDay   = Calendar.utc.date(byAdding: .day, value: 1, to: startOfDay)!
         logger.info("[PricingActivity] starting runDate=\(runDate) startOfDay=\(startOfDay) endOfDay=\(endOfDay)")
         let contracts = try await OptionContract.query(on: db)
             .filter(\.$expirationDate >= startOfDay)

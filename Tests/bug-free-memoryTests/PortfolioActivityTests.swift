@@ -60,6 +60,7 @@ private func withPortfolioDB(
         app.migrations.add(CreateExchanges())
         app.migrations.add(CreateInstruments())
         app.migrations.add(CreateEquities())
+        app.migrations.add(CreateIndexes())
         app.migrations.add(CreateOptionContracts())
         app.migrations.add(CreateOAuthToken())
         try await app.autoMigrate()

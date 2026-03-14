@@ -162,9 +162,9 @@ private func seedContract(
 
 private func quoteJSON(_ osiSymbol: String, bid: Double = 1.10, ask: Double = 1.20) -> Data {
     Data("""
-    {"\(osiSymbol)": {"bid": \(bid), "ask": \(ask), "last": 1.15, "volatility": 0.30,
+    {"\(osiSymbol)": {"quote": {"bid": \(bid), "ask": \(ask), "last": 1.15, "volatility": 0.30,
      "underlyingPrice": 175.0, "delta": 0.45, "gamma": 0.02, "theta": -0.05,
-     "vega": 0.10, "rho": 0.01, "volume": 500, "openInterest": 1200}}
+     "vega": 0.10, "rho": 0.01, "volume": 500, "openInterest": 1200}}}
     """.utf8)
 }
 

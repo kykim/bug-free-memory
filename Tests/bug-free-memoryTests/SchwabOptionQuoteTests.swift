@@ -112,7 +112,7 @@ struct FetchOptionEODPriceTests {
         let json = """
         {
             "AAPL  260320C00175000": {
-                "bid": 1.10, "ask": 1.20, "volatility": 0.30
+                "quote": {"bid": 1.10, "ask": 1.20, "volatility": 0.30}
             }
         }
         """.data(using: .utf8)!

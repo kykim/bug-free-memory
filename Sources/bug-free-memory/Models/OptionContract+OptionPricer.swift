@@ -120,7 +120,7 @@ extension OptionContract {
     }
 
     /// Resolves volatility using the chosen method.
-    private func resolveVolatility(from prices: [EODPrice], method: VolatilityMethod) -> Double? {
+    func resolveVolatility(from prices: [EODPrice], method: VolatilityMethod) -> Double? {
         switch method {
         case .historical(let lookback):
             return historicalVolatility(from: prices, lookback: lookback)
@@ -196,6 +196,7 @@ extension OptionContract {
     ) -> OptionPriceResult? {
 
         let S = currentPrice.adjClose ?? currentPrice.close
+        let K = strikePrice
         let T = timeToExpiry()
         guard T > 0, let histVol = resolveVolatility(from: priceHistory, method: volatilityMethod) else { return nil }
 

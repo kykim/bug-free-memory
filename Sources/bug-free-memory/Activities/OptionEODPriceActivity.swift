@@ -58,7 +58,7 @@ struct OptionEODPriceActivities {
 
             let quote: SchwabOptionQuote?
             do {
-                quote = try await schwabClient.fetchOptionQuote(osiSymbol: osiSymbol)
+                quote = try await schwabClient.fetchOptionEODPrice(osiSymbol: osiSymbol)
             } catch SchwabError.authFailure {
                 throw SchwabError.authFailure
             } catch {
@@ -85,16 +85,16 @@ struct OptionEODPriceActivities {
             let tte = contract.timeToExpiry(from: runDate)
             let riskFreeRate = yieldCurve.interpolate(timeToExpiry: tte)
 
-            let iv = q.volatility.map { $0 / 100.0 }
+            let iv = q.impliedVolatility.map { $0 / 100.0 }
             if let existing = try await OptionEODPrice.query(on: db)
                 .filter(\.$instrument.$id == instrumentID)
                 .filter(\.$priceDate == startOfDay)
                 .first() {
-                existing.bid              = q.bidPrice
-                existing.ask              = q.askPrice
-                existing.last             = q.lastPrice
+                existing.bid              = q.bid
+                existing.ask              = q.ask
+                existing.last             = q.last
                 existing.settlementPrice  = q.closePrice
-                existing.volume           = q.totalVolume
+                existing.volume           = q.volume
                 existing.openInterest     = q.openInterest
                 existing.impliedVolatility = iv
                 existing.delta            = q.delta
@@ -109,8 +109,8 @@ struct OptionEODPriceActivities {
             } else {
                 try await OptionEODPrice(
                     instrumentID: instrumentID, priceDate: startOfDay,
-                    bid: q.bidPrice, ask: q.askPrice, last: q.lastPrice,
-                    settlementPrice: q.closePrice, volume: q.totalVolume,
+                    bid: q.bid, ask: q.ask, last: q.last,
+                    settlementPrice: q.closePrice, volume: q.volume,
                     openInterest: q.openInterest, impliedVolatility: iv,
                     delta: q.delta, gamma: q.gamma, theta: q.theta,
                     vega: q.vega, rho: q.rho, underlyingPrice: q.underlyingPrice,
