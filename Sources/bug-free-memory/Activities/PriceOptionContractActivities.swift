@@ -29,53 +29,19 @@ public struct PriceOptionContractActivities {
     @Activity
     public func priceBlackScholes(input: PriceOptionContractInput) async throws -> Int {
         logger.info("[PriceOptionContract] priceBlackScholes contractID=\(input.contractID)")
-        let (contract, latest, eodHistory, priceDate, riskFreeRate, marketIV) = try await fetchPricingInputs(contractID: input.contractID)
-        let record: TheoreticalOptionEODPrice
-        if let result = contract.blackScholesPrice(currentPrice: latest, priceHistory: eodHistory, riskFreeRate: riskFreeRate, volatilityMethod: .historical(lookback: 30)) {
-            logger.info("[PriceOptionContract] blackScholes price=\(result.price) contractID=\(input.contractID)")
-            record = TheoreticalOptionEODPrice.from(result: result, instrumentID: input.contractID, priceDate: priceDate, riskFreeRate: riskFreeRate, pricingModel: .blackScholes, source: "calculated")
-        } else {
-            logger.warning("[PriceOptionContract] blackScholes returned nil contractID=\(input.contractID) T=\(contract.timeToExpiry()) historyCount=\(eodHistory.count) — upserting 0.00")
-            record = TheoreticalOptionEODPrice(
-                instrumentID: input.contractID,
-                priceDate: priceDate,
-                price: 0.0,
-                historicalVolatility: 0.0,
-                riskFreeRate: riskFreeRate,
-                underlyingPrice: latest.adjClose ?? latest.close,
-                model: .blackScholes,
-                source: "calculated"
-            )
+        return try await priceAndUpsert(input: input, pricerName: "blackScholes", model: .blackScholes) { contract, latest, history, rfr, priceDate in
+            guard let result = contract.blackScholesPrice(currentPrice: latest, priceHistory: history, riskFreeRate: rfr, volatilityMethod: .historical(lookback: 30)) else { return nil }
+            return TheoreticalOptionEODPrice.from(result: result, instrumentID: input.contractID, priceDate: priceDate, riskFreeRate: rfr, pricingModel: .blackScholes, source: "calculated")
         }
-        record.impliedVolatility = marketIV ?? record.impliedVolatility
-        try await upsert(record, contractID: input.contractID, priceDate: priceDate, model: .blackScholes)
-        return 1
     }
 
     @Activity
     public func priceBinomial(input: PriceOptionContractInput) async throws -> Int {
         logger.info("[PriceOptionContract] priceBinomial contractID=\(input.contractID)")
-        let (contract, latest, eodHistory, priceDate, riskFreeRate, marketIV) = try await fetchPricingInputs(contractID: input.contractID)
-        let record: TheoreticalOptionEODPrice
-        if let result = contract.binomialPrice(currentPrice: latest, priceHistory: eodHistory, riskFreeRate: riskFreeRate, volatilityMethod: .historical(lookback: 30)) {
-            logger.info("[PriceOptionContract] binomial price=\(result.price) contractID=\(input.contractID)")
-            record = TheoreticalOptionEODPrice.from(result: result, instrumentID: input.contractID, priceDate: priceDate, riskFreeRate: riskFreeRate, pricingModel: .binomial, source: "calculated")
-        } else {
-            logger.warning("[PriceOptionContract] binomial returned nil contractID=\(input.contractID) T=\(contract.timeToExpiry()) historyCount=\(eodHistory.count) — upserting 0.00")
-            record = TheoreticalOptionEODPrice(
-                instrumentID: input.contractID,
-                priceDate: priceDate,
-                price: 0.0,
-                historicalVolatility: 0.0,
-                riskFreeRate: riskFreeRate,
-                underlyingPrice: latest.adjClose ?? latest.close,
-                model: .binomial,
-                source: "calculated"
-            )
+        return try await priceAndUpsert(input: input, pricerName: "binomial", model: .binomial) { contract, latest, history, rfr, priceDate in
+            guard let result = contract.binomialPrice(currentPrice: latest, priceHistory: history, riskFreeRate: rfr, volatilityMethod: .historical(lookback: 30)) else { return nil }
+            return TheoreticalOptionEODPrice.from(result: result, instrumentID: input.contractID, priceDate: priceDate, riskFreeRate: rfr, pricingModel: .binomial, source: "calculated")
         }
-        record.impliedVolatility = marketIV ?? record.impliedVolatility
-        try await upsert(record, contractID: input.contractID, priceDate: priceDate, model: .binomial)
-        return 1
     }
 
     /// Runs the full Monte Carlo simulation and stores the price. Greeks are not computed
@@ -83,27 +49,10 @@ public struct PriceOptionContractActivities {
     @Activity
     public func priceMonteCarloPriceOnly(input: PriceOptionContractInput) async throws -> Int {
         logger.info("[PriceOptionContract] priceMonteCarloPriceOnly contractID=\(input.contractID)")
-        let (contract, latest, eodHistory, priceDate, riskFreeRate, marketIV) = try await fetchPricingInputs(contractID: input.contractID)
-        let record: TheoreticalOptionEODPrice
-        if let result = contract.monteCarloPrice(currentPrice: latest, priceHistory: eodHistory, riskFreeRate: riskFreeRate, volatilityMethod: .historical(lookback: 30), simulations: 100_000, stepsPerPath: 252, computeGreeks: false) {
-            logger.info("[PriceOptionContract] monteCarlo price=\(result.price) contractID=\(input.contractID)")
-            record = TheoreticalOptionEODPrice.from(result: result, instrumentID: input.contractID, priceDate: priceDate, riskFreeRate: riskFreeRate, source: "calculated")
-        } else {
-            logger.warning("[PriceOptionContract] monteCarlo returned nil contractID=\(input.contractID) T=\(contract.timeToExpiry()) historyCount=\(eodHistory.count) — upserting 0.00")
-            record = TheoreticalOptionEODPrice(
-                instrumentID: input.contractID,
-                priceDate: priceDate,
-                price: 0.0,
-                historicalVolatility: 0.0,
-                riskFreeRate: riskFreeRate,
-                underlyingPrice: latest.adjClose ?? latest.close,
-                model: .monteCarlo,
-                source: "calculated"
-            )
+        return try await priceAndUpsert(input: input, pricerName: "monteCarlo", model: .monteCarlo) { contract, latest, history, rfr, priceDate in
+            guard let result = contract.monteCarloPrice(currentPrice: latest, priceHistory: history, riskFreeRate: rfr, volatilityMethod: .historical(lookback: 30), simulations: 100_000, stepsPerPath: 252, computeGreeks: false) else { return nil }
+            return TheoreticalOptionEODPrice.from(result: result, instrumentID: input.contractID, priceDate: priceDate, riskFreeRate: rfr, source: "calculated")
         }
-        record.impliedVolatility = marketIV ?? record.impliedVolatility
-        try await upsert(record, contractID: input.contractID, priceDate: priceDate, model: .monteCarlo)
-        return 1
     }
 
     /// Runs the Monte Carlo simulation with all Greeks (7–8 bump-and-reprice runs at n/4
@@ -133,6 +82,35 @@ public struct PriceOptionContractActivities {
 
     // MARK: - Helpers
 
+    private func priceAndUpsert(
+        input: PriceOptionContractInput,
+        pricerName: String,
+        model: PricingModel,
+        pricer: (OptionContract, EODPrice, [EODPrice], Double, Date) -> TheoreticalOptionEODPrice?
+    ) async throws -> Int {
+        let (contract, latest, eodHistory, priceDate, riskFreeRate, marketIV) = try await fetchPricingInputs(contractID: input.contractID)
+        let record: TheoreticalOptionEODPrice
+        if let r = pricer(contract, latest, eodHistory, riskFreeRate, priceDate) {
+            logger.info("[PriceOptionContract] \(pricerName) price=\(r.price) contractID=\(input.contractID)")
+            record = r
+        } else {
+            logger.warning("[PriceOptionContract] \(pricerName) returned nil contractID=\(input.contractID) T=\(contract.timeToExpiry()) historyCount=\(eodHistory.count) — upserting 0.00")
+            record = TheoreticalOptionEODPrice(
+                instrumentID: input.contractID,
+                priceDate: priceDate,
+                price: 0.0,
+                historicalVolatility: 0.0,
+                riskFreeRate: riskFreeRate,
+                underlyingPrice: latest.adjClose ?? latest.close,
+                model: model,
+                source: "calculated"
+            )
+        }
+        record.impliedVolatility = marketIV ?? record.impliedVolatility
+        try await upsert(record, contractID: input.contractID, priceDate: priceDate, model: model)
+        return 1
+    }
+
     private func fetchPricingInputs(contractID: UUID) async throws -> (OptionContract, EODPrice, [EODPrice], Date, Double, Double?) {
         guard let contract = try await OptionContract.query(on: db)
             .filter(\.$id == contractID)
@@ -152,7 +130,7 @@ public struct PriceOptionContractActivities {
         }
         logger.debug("[PriceOptionContract] eodHistory count=\(eodHistory.count) latestDate=\(latest.priceDate) latestClose=\(latest.close)")
         let priceDate = Calendar.utc.startOfDay(for: latest.priceDate)
-        let nextDay = Calendar.utc.date(byAdding: .day, value: 1, to: priceDate)!
+        let nextDay   = Calendar.utc.date(byAdding: .day, value: 1, to: priceDate)!
 
         // Fetch market IV from today's option EOD price (mirrors what the batch pricer does)
         let marketIV = try? await OptionEODPrice.query(on: db)
@@ -199,10 +177,3 @@ public struct PriceOptionContractActivities {
     }
 }
 
-private extension Calendar {
-    static let utc: Calendar = {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        return cal
-    }()
-}

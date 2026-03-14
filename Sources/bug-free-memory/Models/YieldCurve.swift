@@ -7,7 +7,6 @@
 
 import Fluent
 import Foundation
-import FluentSQL
 
 struct YieldCurve: Sendable {
 
@@ -35,10 +34,8 @@ struct YieldCurve: Sendable {
         }
 
         // Start/end of that day
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        let start = cal.startOfDay(for: observationDate)
-        guard let end = cal.date(byAdding: .day, value: 1, to: start) else {
+        let start = Calendar.utc.startOfDay(for: observationDate)
+        guard let end = Calendar.utc.date(byAdding: .day, value: 1, to: start) else {
             return YieldCurve(points: [], observationDate: runDate)
         }
 

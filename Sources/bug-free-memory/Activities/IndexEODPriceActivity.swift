@@ -7,7 +7,6 @@
 //
 
 import Fluent
-import FluentSQL
 import Foundation
 import Logging
 import Temporal
@@ -39,8 +38,7 @@ struct IndexEODPriceActivities {
 
         logger.info("[IndexEODPriceActivity] starting — indexes=\(instruments.count) runDate=\(runDate)")
 
-        let sqlDB = db as! any SQLDatabase
-        let priceDate = Calendar.utcCal.startOfDay(for: runDate)
+        let priceDate = Calendar.utc.startOfDay(for: runDate)
         var rowsUpserted = 0
         var failedTickers: [String] = []
 
@@ -69,25 +67,26 @@ struct IndexEODPriceActivities {
             }
 
             logger.debug("[IndexEODPriceActivity] upserting \(ticker) priceDate=\(priceDate) close=\(close)")
-            let newID = UUID()
 
             do {
-                try await sqlDB.raw("""
-                    INSERT INTO eod_prices
-                        (id, instrument_id, price_date, open, high, low, close, volume, source)
-                    VALUES
-                        (\(bind: newID), \(bind: instrumentID), \(bind: priceDate),
-                         \(bind: q.openPrice), \(bind: q.highPrice), \(bind: q.lowPrice),
-                         \(bind: close), \(bind: q.totalVolume),
-                         'schwab')
-                    ON CONFLICT (instrument_id, price_date) DO UPDATE SET
-                        open   = EXCLUDED.open,
-                        high   = EXCLUDED.high,
-                        low    = EXCLUDED.low,
-                        close  = EXCLUDED.close,
-                        volume = EXCLUDED.volume,
-                        source = 'schwab'
-                    """).run()
+                if let existing = try await EODPrice.query(on: db)
+                    .filter(\.$instrument.$id == instrumentID)
+                    .filter(\.$priceDate == priceDate)
+                    .first() {
+                    existing.open   = q.openPrice
+                    existing.high   = q.highPrice
+                    existing.low    = q.lowPrice
+                    existing.close  = close
+                    existing.volume = q.totalVolume
+                    existing.source = "schwab"
+                    try await existing.save(on: db)
+                } else {
+                    try await EODPrice(
+                        instrumentID: instrumentID, priceDate: priceDate,
+                        open: q.openPrice, high: q.highPrice, low: q.lowPrice,
+                        close: close, volume: q.totalVolume, source: "schwab"
+                    ).create(on: db)
+                }
             } catch {
                 logger.error("[IndexEODPriceActivity] upsert failed for \(ticker) (\(instrumentID)) priceDate=\(priceDate): \(error)")
                 failedTickers.append(ticker)
@@ -108,10 +107,3 @@ struct IndexEODPriceActivities {
     }
 }
 
-private extension Calendar {
-    static let utcCal: Calendar = {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        return cal
-    }()
-}

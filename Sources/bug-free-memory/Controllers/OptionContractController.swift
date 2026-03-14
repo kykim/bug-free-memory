@@ -1,5 +1,4 @@
 import Fluent
-import FluentSQL
 import Foundation
 import Leaf
 import Vapor
@@ -28,7 +27,7 @@ struct OptionContractController: RouteCollection {
             .filter(.sql(unsafeRaw: "\"instrument_type\" IN ('equity_option'::instrument_type, 'index_option'::instrument_type)"))
             .sort(\.$ticker).all()
         let (flash, flashType) = req.popFlash()
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = TimeZone(identifier: "UTC")
+        let df = DateFormatter.utcYMD
         struct ContractRow: Encodable {
             var id: String
             var underlying: UnderlyingRow
@@ -83,9 +82,7 @@ struct OptionContractController: RouteCollection {
             .range((page - 1) * pageSize ..< page * pageSize)
             .all()
 
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        df.timeZone = TimeZone(identifier: "UTC")
+        let df = DateFormatter.utcYMD
 
         struct TheoreticalPriceRow: Encodable {
             var model: String
@@ -278,7 +275,7 @@ struct OptionContractController: RouteCollection {
         let form = try req.content.decode(FetchForm.self)
         let priceDate: Date
         if let dateStr = form.local_date,
-           let parsed = { let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = .current; return df }().date(from: dateStr) {
+           let parsed = { let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = .current; return df }().date(from: dateStr) { // local TZ intentional — user-supplied date
             priceDate = parsed
         } else {
             priceDate = Calendar.current.startOfDay(for: Date())
@@ -288,37 +285,37 @@ struct OptionContractController: RouteCollection {
             guard let quote = try await schwab.fetchOptionQuote(osiSymbol: osiSymbol) else {
                 return req.flash("No quote returned for \(osiSymbol).", type: "error", to: "/option-contracts/\(id)")
             }
-            let sqlDB = req.db as! any SQLDatabase
-            try await sqlDB.raw("""
-                INSERT INTO option_eod_prices
-                    (id, instrument_id, price_date, bid, ask, last, settlement_price,
-                     volume, open_interest, implied_volatility,
-                     delta, gamma, theta, vega, rho, underlying_price, source)
-                VALUES
-                    (\(bind: UUID()), \(bind: id), \(bind: priceDate),
-                     \(bind: quote.bidPrice), \(bind: quote.askPrice), \(bind: quote.lastPrice),
-                     \(bind: quote.closePrice),
-                     \(bind: quote.totalVolume), \(bind: quote.openInterest),
-                     \(bind: quote.volatility.map { $0 / 100.0 }),
-                     \(bind: quote.delta), \(bind: quote.gamma), \(bind: quote.theta),
-                     \(bind: quote.vega), \(bind: quote.rho), \(bind: quote.underlyingPrice),
-                     'schwab')
-                ON CONFLICT (instrument_id, price_date) DO UPDATE SET
-                    bid                = EXCLUDED.bid,
-                    ask                = EXCLUDED.ask,
-                    last               = EXCLUDED.last,
-                    settlement_price   = EXCLUDED.settlement_price,
-                    volume             = EXCLUDED.volume,
-                    open_interest      = EXCLUDED.open_interest,
-                    implied_volatility = EXCLUDED.implied_volatility,
-                    delta              = EXCLUDED.delta,
-                    gamma              = EXCLUDED.gamma,
-                    theta              = EXCLUDED.theta,
-                    vega               = EXCLUDED.vega,
-                    rho                = EXCLUDED.rho,
-                    underlying_price   = EXCLUDED.underlying_price,
-                    source             = 'schwab'
-                """).run()
+            let iv = quote.volatility.map { $0 / 100.0 }
+            if let existing = try await OptionEODPrice.query(on: req.db)
+                .filter(\.$instrument.$id == id)
+                .filter(\.$priceDate == priceDate)
+                .first() {
+                existing.bid              = quote.bidPrice
+                existing.ask              = quote.askPrice
+                existing.last             = quote.lastPrice
+                existing.settlementPrice  = quote.closePrice
+                existing.volume           = quote.totalVolume
+                existing.openInterest     = quote.openInterest
+                existing.impliedVolatility = iv
+                existing.delta            = quote.delta
+                existing.gamma            = quote.gamma
+                existing.theta            = quote.theta
+                existing.vega             = quote.vega
+                existing.rho              = quote.rho
+                existing.underlyingPrice  = quote.underlyingPrice
+                existing.source           = "schwab"
+                try await existing.save(on: req.db)
+            } else {
+                try await OptionEODPrice(
+                    instrumentID: id, priceDate: priceDate,
+                    bid: quote.bidPrice, ask: quote.askPrice, last: quote.lastPrice,
+                    settlementPrice: quote.closePrice, volume: quote.totalVolume,
+                    openInterest: quote.openInterest, impliedVolatility: iv,
+                    delta: quote.delta, gamma: quote.gamma, theta: quote.theta,
+                    vega: quote.vega, rho: quote.rho, underlyingPrice: quote.underlyingPrice,
+                    source: "schwab"
+                ).create(on: req.db)
+            }
         } catch {
             return req.flash("Fetch failed: \(error)", type: "error", to: "/option-contracts/\(id)")
         }

@@ -1,11 +1,21 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(git checkout:*)",
+      "Bash(git branch:*)",
       "Bash(git add:*)",
-      "Bash(git rebase:*)",
-      "Bash(find *)",
-      "Bash(grep *)"
+      "Bash(git commit:*)",
+      "Bash(git merge:*)",
+      "Bash(swift build:*)",
+      "Bash(swift test:*)",
+      "Bash(mv tickets/*:*)"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git merge *main*)"
     ]
   }
 }

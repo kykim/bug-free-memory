@@ -1,5 +1,4 @@
 import Fluent
-import FluentSQL
 import Foundation
 import Leaf
 import Vapor
@@ -71,9 +70,7 @@ struct IndexController: RouteCollection {
             .range((page - 1) * pageSize ..< page * pageSize)
             .all()
 
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        df.timeZone = TimeZone(identifier: "UTC")
+        let df = DateFormatter.utcYMD
 
         struct PriceRow: Encodable {
             var priceDate: String
@@ -140,23 +137,12 @@ struct IndexController: RouteCollection {
                   let close = quote.closePrice else {
                 return req.flash("No quote returned for \(instrument.ticker).", type: "error", to: "/indexes/\(id)")
             }
-            let priceDate = utcStartOfDay(Date())
-            let sqlDB = req.db as! any SQLDatabase
-            try await sqlDB.raw("""
-                INSERT INTO eod_prices
-                    (id, instrument_id, price_date, open, high, low, close, volume, source)
-                VALUES
-                    (\(bind: UUID()), \(bind: id), \(bind: priceDate),
-                     \(bind: quote.openPrice), \(bind: quote.highPrice), \(bind: quote.lowPrice),
-                     \(bind: close), \(bind: quote.totalVolume), 'schwab')
-                ON CONFLICT (instrument_id, price_date) DO UPDATE SET
-                    open   = EXCLUDED.open,
-                    high   = EXCLUDED.high,
-                    low    = EXCLUDED.low,
-                    close  = EXCLUDED.close,
-                    volume = EXCLUDED.volume,
-                    source = 'schwab'
-                """).run()
+            let priceDate = Calendar.utc.startOfDay(for: Date())
+            try await upsertEODPrice(
+                on: req.db, instrumentID: id, priceDate: priceDate,
+                open: quote.openPrice, high: quote.highPrice, low: quote.lowPrice,
+                close: close, volume: quote.totalVolume
+            )
         } catch {
             return req.flash("Fetch failed: \(error)", type: "error", to: "/indexes/\(id)")
         }
@@ -178,25 +164,14 @@ struct IndexController: RouteCollection {
         do {
             try await schwab.refreshTokenIfNeeded(db: req.db)
             let history = try await schwab.fetchPriceHistory(ticker: instrument.ticker)
-            let sqlDB = req.db as! any SQLDatabase
             var upserted = 0
             for candle in history.candles {
-                let priceDate = utcStartOfDay(candle.date)
-                try await sqlDB.raw("""
-                    INSERT INTO eod_prices
-                        (id, instrument_id, price_date, open, high, low, close, volume, source)
-                    VALUES
-                        (\(bind: UUID()), \(bind: id), \(bind: priceDate),
-                         \(bind: candle.open), \(bind: candle.high), \(bind: candle.low),
-                         \(bind: candle.close), \(bind: candle.volume), 'schwab')
-                    ON CONFLICT (instrument_id, price_date) DO UPDATE SET
-                        open   = EXCLUDED.open,
-                        high   = EXCLUDED.high,
-                        low    = EXCLUDED.low,
-                        close  = EXCLUDED.close,
-                        volume = EXCLUDED.volume,
-                        source = 'schwab'
-                    """).run()
+                let priceDate = Calendar.utc.startOfDay(for: candle.date)
+                try await upsertEODPrice(
+                    on: req.db, instrumentID: id, priceDate: priceDate,
+                    open: candle.open, high: candle.high, low: candle.low,
+                    close: candle.close, volume: candle.volume
+                )
                 upserted += 1
             }
             count = upserted
@@ -251,8 +226,33 @@ struct IndexController: RouteCollection {
 
 // MARK: - Helpers
 
-private func utcStartOfDay(_ date: Date) -> Date {
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = TimeZone(identifier: "UTC")!
-    return cal.startOfDay(for: date)
+private func upsertEODPrice(
+    on db: any Database,
+    instrumentID: UUID,
+    priceDate: Date,
+    open: Double?,
+    high: Double?,
+    low: Double?,
+    close: Double,
+    volume: Int?
+) async throws {
+    if let existing = try await EODPrice.query(on: db)
+        .filter(\.$instrument.$id == instrumentID)
+        .filter(\.$priceDate == priceDate)
+        .first() {
+        existing.open   = open
+        existing.high   = high
+        existing.low    = low
+        existing.close  = close
+        existing.volume = volume
+        existing.source = "schwab"
+        try await existing.save(on: db)
+    } else {
+        try await EODPrice(
+            instrumentID: instrumentID, priceDate: priceDate,
+            open: open, high: high, low: low,
+            close: close, volume: volume, source: "schwab"
+        ).create(on: db)
+    }
 }
+

@@ -8,7 +8,6 @@
 //
 
 import Fluent
-import FluentSQL
 import Foundation
 import Logging
 import Temporal
@@ -38,56 +37,48 @@ struct RunLogActivities {
         let failedContractIDs: [UUID] = input.pricingResult?.failedContracts
             .map { $0.instrumentID } ?? []
 
-        let sqlDB = db as! any SQLDatabase
-        let newID = UUID()
-        let runDateOnly = Calendar.utcCal.startOfDay(for: input.runDate)
+        let runDateOnly = Calendar.utc.startOfDay(for: input.runDate)
 
-        try await sqlDB.raw("""
-            INSERT INTO job_runs
-                (id, run_date, status,
-                 equities_fetched, options_fetched, contracts_priced, theoretical_rows, new_contracts,
-                 dropped_positions, failed_tickers, skipped_contracts, failed_contracts, error_messages,
-                 source_used, started_at, completed_at)
-            VALUES
-                (\(bind: newID), \(bind: runDateOnly), \(bind: input.status.rawValue),
-                 \(bind: input.portfolioResult?.equityInstrumentIDs.count),
-                 \(bind: input.portfolioResult?.optionInstrumentIDs.count),
-                 \(bind: input.pricingResult?.contractsPriced),
-                 \(bind: input.pricingResult?.rowsUpserted),
-                 \(bind: input.portfolioResult?.newContractsRegistered),
-                 \(bind: droppedPositionsStrings),
-                 \(bind: input.eodResult?.failedTickers ?? []),
-                 \(bind: skippedContractStrings),
-                 \(bind: failedContractIDs),
-                 \(bind: input.errorMessages),
-                 \(bind: input.eodResult?.source),
-                 \(bind: input.startedAt), \(bind: completedAt))
-            ON CONFLICT (run_date) DO UPDATE SET
-                status            = EXCLUDED.status,
-                equities_fetched  = EXCLUDED.equities_fetched,
-                options_fetched   = EXCLUDED.options_fetched,
-                contracts_priced  = EXCLUDED.contracts_priced,
-                theoretical_rows  = EXCLUDED.theoretical_rows,
-                new_contracts     = EXCLUDED.new_contracts,
-                dropped_positions = EXCLUDED.dropped_positions,
-                failed_tickers    = EXCLUDED.failed_tickers,
-                skipped_contracts = EXCLUDED.skipped_contracts,
-                failed_contracts  = EXCLUDED.failed_contracts,
-                error_messages    = EXCLUDED.error_messages,
-                source_used       = EXCLUDED.source_used,
-                completed_at      = EXCLUDED.completed_at
-            """).run()
-        // Note: started_at is intentionally excluded from DO UPDATE to preserve original value.
+        if let existing = try await JobRun.query(on: db)
+            .filter(\.$runDate == runDateOnly)
+            .first() {
+            // started_at is intentionally not updated — preserve the original value
+            existing.status           = input.status.rawValue
+            existing.equitiesFetched  = input.portfolioResult?.equityInstrumentIDs.count
+            existing.optionsFetched   = input.portfolioResult?.optionInstrumentIDs.count
+            existing.contractsPriced  = input.pricingResult?.contractsPriced
+            existing.theoreticalRows  = input.pricingResult?.rowsUpserted
+            existing.newContracts     = input.portfolioResult?.newContractsRegistered
+            existing.droppedPositions = droppedPositionsStrings
+            existing.failedTickers    = input.eodResult?.failedTickers ?? []
+            existing.skippedContracts = skippedContractStrings
+            existing.failedContracts  = failedContractIDs
+            existing.errorMessages    = input.errorMessages
+            existing.sourceUsed       = input.eodResult?.source
+            existing.completedAt      = completedAt
+            try await existing.save(on: db)
+        } else {
+            try await JobRun(
+                runDate:          runDateOnly,
+                status:           input.status.rawValue,
+                equitiesFetched:  input.portfolioResult?.equityInstrumentIDs.count,
+                optionsFetched:   input.portfolioResult?.optionInstrumentIDs.count,
+                contractsPriced:  input.pricingResult?.contractsPriced,
+                theoreticalRows:  input.pricingResult?.rowsUpserted,
+                newContracts:     input.portfolioResult?.newContractsRegistered,
+                droppedPositions: droppedPositionsStrings,
+                failedTickers:    input.eodResult?.failedTickers ?? [],
+                skippedContracts: skippedContractStrings,
+                failedContracts:  failedContractIDs,
+                errorMessages:    input.errorMessages,
+                sourceUsed:       input.eodResult?.source,
+                startedAt:        input.startedAt,
+                completedAt:      completedAt
+            ).create(on: db)
+        }
 
         let duration = completedAt.timeIntervalSince(input.startedAt)
         logger.info("[RunLogActivity] wrote run log — runDate=\(input.runDate) status=\(input.status.rawValue) duration=\(String(format: "%.2f", duration))s")
     }
 }
 
-private extension Calendar {
-    static let utcCal: Calendar = {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        return cal
-    }()
-}

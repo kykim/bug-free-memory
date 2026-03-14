@@ -64,12 +64,3 @@ public struct UpsertEODPricesActivities {
     }
 }
 
-// MARK: - Calendar helper
-
-private extension Calendar {
-    static let utc: Calendar = {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        return cal
-    }()
-}

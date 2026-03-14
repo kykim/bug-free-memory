@@ -10,7 +10,6 @@
 //
 
 import Fluent
-import FluentSQL
 import Foundation
 import Logging
 import Temporal
@@ -34,7 +33,7 @@ struct OptionEODPriceActivities {
         try await schwabClient.refreshTokenIfNeeded(db: db)
 
         // 2. Query non-expired contracts
-        let startOfDay = Calendar.utcCal.startOfDay(for: runDate)
+        let startOfDay = Calendar.utc.startOfDay(for: runDate)
         let contracts = try await OptionContract.query(on: db)
             .filter(\.$expirationDate >= startOfDay)
             .all()
@@ -42,7 +41,6 @@ struct OptionEODPriceActivities {
         // 3. Load yield curve once
         let yieldCurve = try await YieldCurve.load(db: db, runDate: runDate)
 
-        let sqlDB = db as! any SQLDatabase
         var rowsUpserted = 0
         var skippedContracts: [SkippedContract] = []
 
@@ -87,38 +85,38 @@ struct OptionEODPriceActivities {
             let tte = contract.timeToExpiry(from: runDate)
             let riskFreeRate = yieldCurve.interpolate(timeToExpiry: tte)
 
-            let newID = UUID()
-
-            // NOTE: mid is excluded — it is a GENERATED ALWAYS AS column
-            try await sqlDB.raw("""
-                INSERT INTO option_eod_prices
-                    (id, instrument_id, price_date,
-                     bid, ask, last, settlement_price, volume, open_interest,
-                     implied_volatility, delta, gamma, theta, vega, rho,
-                     underlying_price, risk_free_rate, source)
-                VALUES
-                    (\(bind: newID), \(bind: instrumentID), \(bind: startOfDay),
-                     \(bind: q.bidPrice), \(bind: q.askPrice), \(bind: q.lastPrice),
-                     \(bind: q.closePrice), \(bind: q.totalVolume), \(bind: q.openInterest),
-                     \(bind: q.volatility.map { $0 / 100.0 }), \(bind: q.delta), \(bind: q.gamma),
-                     \(bind: q.theta), \(bind: q.vega), \(bind: q.rho),
-                     \(bind: q.underlyingPrice), \(bind: riskFreeRate), 'schwab')
-                ON CONFLICT (instrument_id, price_date) DO UPDATE SET
-                    bid               = EXCLUDED.bid,
-                    ask               = EXCLUDED.ask,
-                    last              = EXCLUDED.last,
-                    volume            = EXCLUDED.volume,
-                    open_interest     = EXCLUDED.open_interest,
-                    implied_volatility = EXCLUDED.implied_volatility,
-                    delta             = EXCLUDED.delta,
-                    gamma             = EXCLUDED.gamma,
-                    theta             = EXCLUDED.theta,
-                    vega              = EXCLUDED.vega,
-                    rho               = EXCLUDED.rho,
-                    underlying_price  = EXCLUDED.underlying_price,
-                    risk_free_rate    = EXCLUDED.risk_free_rate,
-                    source            = 'schwab'
-                """).run()
+            let iv = q.volatility.map { $0 / 100.0 }
+            if let existing = try await OptionEODPrice.query(on: db)
+                .filter(\.$instrument.$id == instrumentID)
+                .filter(\.$priceDate == startOfDay)
+                .first() {
+                existing.bid              = q.bidPrice
+                existing.ask              = q.askPrice
+                existing.last             = q.lastPrice
+                existing.settlementPrice  = q.closePrice
+                existing.volume           = q.totalVolume
+                existing.openInterest     = q.openInterest
+                existing.impliedVolatility = iv
+                existing.delta            = q.delta
+                existing.gamma            = q.gamma
+                existing.theta            = q.theta
+                existing.vega             = q.vega
+                existing.rho              = q.rho
+                existing.underlyingPrice  = q.underlyingPrice
+                existing.riskFreeRate     = riskFreeRate
+                existing.source           = "schwab"
+                try await existing.save(on: db)
+            } else {
+                try await OptionEODPrice(
+                    instrumentID: instrumentID, priceDate: startOfDay,
+                    bid: q.bidPrice, ask: q.askPrice, last: q.lastPrice,
+                    settlementPrice: q.closePrice, volume: q.totalVolume,
+                    openInterest: q.openInterest, impliedVolatility: iv,
+                    delta: q.delta, gamma: q.gamma, theta: q.theta,
+                    vega: q.vega, rho: q.rho, underlyingPrice: q.underlyingPrice,
+                    riskFreeRate: riskFreeRate, source: "schwab"
+                ).create(on: db)
+            }
 
             rowsUpserted += 1
         }
@@ -133,10 +131,3 @@ struct OptionEODPriceActivities {
     }
 }
 
-private extension Calendar {
-    static let utcCal: Calendar = {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        return cal
-    }()
-}

@@ -8,7 +8,6 @@
 //
 
 import Fluent
-import FluentSQL
 import Foundation
 import Logging
 import Temporal
@@ -146,7 +145,6 @@ struct PricingActivities {
 
         let latest = history.first!
         logger.debug("[PricingActivity] pricing instrumentID=\(instrumentID) osiSymbol=\(contract.osiSymbol ?? "nil") underlyingID=\(contract.$underlying.id) T=\(tte) r=\(r) historyCount=\(history.count) latestDate=\(latest.priceDate) latestClose=\(latest.close)")
-        let sqlDB = db as! any SQLDatabase
         var rowsUpserted = 0
 
         // d. Price with all three models
@@ -159,7 +157,7 @@ struct PricingActivities {
                 pricingModel: .blackScholes, source: "calculated"
             )
             record.impliedVolatility = optionEOD.impliedVolatility
-            do { try await upsert(record: record, on: sqlDB); rowsUpserted += 1 } catch {
+            do { try await upsert(record: record); rowsUpserted += 1 } catch {
                 logger.error("[PricingActivity] upsert blackScholes failed instrumentID=\(instrumentID) error=\(String(reflecting: error))")
             }
         } else {
@@ -175,7 +173,7 @@ struct PricingActivities {
                 pricingModel: .binomial, source: "calculated"
             )
             record.impliedVolatility = optionEOD.impliedVolatility
-            do { try await upsert(record: record, on: sqlDB); rowsUpserted += 1 } catch {
+            do { try await upsert(record: record); rowsUpserted += 1 } catch {
                 logger.error("[PricingActivity] upsert binomial failed instrumentID=\(instrumentID) error=\(String(reflecting: error))")
             }
         } else {
@@ -191,7 +189,7 @@ struct PricingActivities {
                 priceDate: startOfDay, riskFreeRate: r, source: "calculated"
             )
             record.impliedVolatility = optionEOD.impliedVolatility
-            do { try await upsert(record: record, on: sqlDB); rowsUpserted += 1 } catch {
+            do { try await upsert(record: record); rowsUpserted += 1 } catch {
                 logger.error("[PricingActivity] upsert monteCarlo failed instrumentID=\(instrumentID) error=\(String(reflecting: error))")
             }
         } else {
@@ -209,40 +207,30 @@ struct PricingActivities {
 
     // MARK: - Private: upsert one theoretical price
 
-    private func upsert(record: TheoreticalOptionEODPrice, on sqlDB: any SQLDatabase) async throws {
+    private func upsert(record: TheoreticalOptionEODPrice) async throws {
         let instrumentID = record.$instrument.id
-        let newID = UUID()
-        let modelStr = record.model.rawValue
-
-        try await sqlDB.raw("""
-            INSERT INTO theoretical_option_eod_prices
-                (id, instrument_id, price_date, price, settlement_price,
-                 implied_volatility, historical_volatility, risk_free_rate,
-                 underlying_price, delta, gamma, theta, vega, rho,
-                 model, model_detail, source)
-            VALUES
-                (\(bind: newID), \(bind: instrumentID), \(bind: record.priceDate),
-                 \(bind: record.price), \(bind: record.settlementPrice),
-                 \(bind: record.impliedVolatility), \(bind: record.historicalVolatility),
-                 \(bind: record.riskFreeRate), \(bind: record.underlyingPrice),
-                 \(bind: record.delta), \(bind: record.gamma), \(bind: record.theta),
-                 \(bind: record.vega), \(bind: record.rho),
-                 \(bind: modelStr)::pricing_model, \(bind: record.modelDetail), \(bind: record.source))
-            ON CONFLICT (instrument_id, price_date, model) DO UPDATE SET
-                price                = EXCLUDED.price,
-                settlement_price     = EXCLUDED.settlement_price,
-                implied_volatility   = EXCLUDED.implied_volatility,
-                historical_volatility = EXCLUDED.historical_volatility,
-                risk_free_rate       = EXCLUDED.risk_free_rate,
-                underlying_price     = EXCLUDED.underlying_price,
-                delta                = EXCLUDED.delta,
-                gamma                = EXCLUDED.gamma,
-                theta                = EXCLUDED.theta,
-                vega                 = EXCLUDED.vega,
-                rho                  = EXCLUDED.rho,
-                model_detail         = EXCLUDED.model_detail,
-                source               = EXCLUDED.source
-            """).run()
+        if let existing = try await TheoreticalOptionEODPrice.query(on: db)
+            .filter(\.$instrument.$id == instrumentID)
+            .filter(\.$priceDate == record.priceDate)
+            .filter(\.$model == record.model)
+            .first() {
+            existing.price                = record.price
+            existing.settlementPrice      = record.settlementPrice
+            existing.impliedVolatility    = record.impliedVolatility
+            existing.historicalVolatility = record.historicalVolatility
+            existing.riskFreeRate         = record.riskFreeRate
+            existing.underlyingPrice      = record.underlyingPrice
+            existing.delta                = record.delta
+            existing.gamma                = record.gamma
+            existing.theta                = record.theta
+            existing.vega                 = record.vega
+            existing.rho                  = record.rho
+            existing.modelDetail          = record.modelDetail
+            existing.source               = record.source
+            try await existing.save(on: db)
+        } else {
+            try await record.create(on: db)
+        }
     }
 }
 
