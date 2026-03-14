@@ -8,6 +8,7 @@ struct TemporalController: RouteCollection {
     func boot(routes: any RoutesBuilder) throws {
         let g = routes.grouped(ClerkMiddleware()).grouped("temporal")
         g.post("register-schedule", use: registerSchedule)
+        g.post("trigger-schedule", use: triggerSchedule)
     }
 
     func registerSchedule(req: Request) async throws -> Response {
@@ -77,5 +78,36 @@ struct TemporalController: RouteCollection {
         }
 
         return req.flash("Schedule '\(scheduleID)' registered (or already existed).", type: "success", to: "/dashboard")
+    }
+
+    func triggerSchedule(req: Request) async throws -> Response {
+        try req.requireDashboardAuth()
+
+        let logger = req.logger
+        let scheduleID = "daily-pipeline-schedule"
+
+        do {
+            let client = try TemporalClient(
+                target: .dns(host: "temporal", port: 7233),
+                transportSecurity: .plaintext,
+                configuration: .init(instrumentation: .init(serverHostname: "temporal")),
+                logger: logger
+            )
+
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask { try await client.run() }
+                try await Task.sleep(for: .milliseconds(500))
+
+                let handle = client.untypedScheduleHandle(id: scheduleID)
+                try await handle.trigger()
+                logger.info("[TemporalController] schedule '\(scheduleID)' triggered")
+
+                group.cancelAll()
+            }
+        } catch {
+            return req.flash("Failed to trigger schedule: \(error)", type: "error", to: "/dashboard")
+        }
+
+        return req.flash("Schedule '\(scheduleID)' triggered.", type: "success", to: "/dashboard")
     }
 }

@@ -23,18 +23,35 @@ enum SchwabAssetType: String, Codable {
 }
 
 struct SchwabPosition: Codable {
-    let ticker: String
+    let ticker: String        // instrument.symbol (OSI symbol for options, ticker for equities; "" if absent)
     let assetType: SchwabAssetType
-    let quantity: Double
-    let osiSymbol: String?
+    let quantity: Double      // longQuantity - shortQuantity
+    let osiSymbol: String?    // instrument.symbol when assetType == .option and non-empty, else nil
     let marketValue: Double?
+    let cusip: String?        // instrument.cusip
+    let underlyingSymbol: String?  // instrument.underlyingSymbol (options only, e.g. "$SPX")
 
-    enum CodingKeys: String, CodingKey {
-        case ticker       = "symbol"
-        case assetType    = "assetType"
-        case quantity
-        case osiSymbol    = "description"
-        case marketValue
+    // Schwab nests symbol/assetType/cusip/underlyingSymbol inside "instrument" and
+    // splits quantity into longQuantity / shortQuantity at the top level.
+    init(from decoder: any Decoder) throws {
+        let top  = try decoder.container(keyedBy: TopKeys.self)
+        let inst = try top.nestedContainer(keyedBy: InstrumentKeys.self, forKey: .instrument)
+        ticker           = try inst.decodeIfPresent(String.self, forKey: .symbol) ?? ""
+        assetType        = try inst.decode(SchwabAssetType.self, forKey: .assetType)
+        osiSymbol        = assetType == .option && !ticker.isEmpty ? ticker : nil
+        cusip            = try inst.decodeIfPresent(String.self, forKey: .cusip)
+        underlyingSymbol = try inst.decodeIfPresent(String.self, forKey: .underlyingSymbol)
+        let long         = try top.decodeIfPresent(Double.self, forKey: .longQuantity)  ?? 0
+        let short        = try top.decodeIfPresent(Double.self, forKey: .shortQuantity) ?? 0
+        quantity         = long - short
+        marketValue      = try top.decodeIfPresent(Double.self, forKey: .marketValue)
+    }
+
+    private enum TopKeys: String, CodingKey {
+        case instrument, longQuantity, shortQuantity, marketValue
+    }
+    private enum InstrumentKeys: String, CodingKey {
+        case symbol, assetType, cusip, underlyingSymbol
     }
 }
 
@@ -42,14 +59,38 @@ struct SchwabPosition: Codable {
 
 extension SchwabClient {
 
+    /// Resolves the plain account number to its Schwab-assigned encrypted hash value.
+    private func resolveAccountHash() async throws -> String {
+        guard let url = URL(string: "\(Self.traderBaseURL)/accounts/accountNumbers") else {
+            throw SchwabError.requestFailed(statusCode: 0)
+        }
+        struct AccountNumberEntry: Decodable {
+            let accountNumber: String
+            let hashValue: String
+        }
+        let entries = try await execute(authorizedRequest(url: url), as: [AccountNumberEntry].self)
+        guard let match = entries.first(where: { $0.accountNumber == accountNumber }) else {
+            throw SchwabError.requestFailed(statusCode: 404)
+        }
+        return match.hashValue
+    }
+
     /// Fetches current portfolio positions from Schwab.
     func fetchPortfolioPositions() async throws -> [SchwabPosition] {
         guard !accountNumber.isEmpty else { throw SchwabError.noAccountNumber }
-        guard let url = URL(string: "\(Self.traderBaseURL)/accounts/\(accountNumber)/positions") else {
+        let hash = try await resolveAccountHash()
+        guard let url = URL(string: "\(Self.traderBaseURL)/accounts/\(hash)?fields=positions") else {
             throw SchwabError.requestFailed(statusCode: 0)
         }
-        let request = authorizedRequest(url: url)
-        return try await execute(request, as: [SchwabPosition].self)
+        let response = try await execute(authorizedRequest(url: url), as: SchwabAccountResponse.self)
+        return response.securitiesAccount.positions ?? []
+    }
+
+    private struct SchwabAccountResponse: Decodable {
+        struct SecuritiesAccount: Decodable {
+            let positions: [SchwabPosition]?
+        }
+        let securitiesAccount: SecuritiesAccount
     }
 
     /// Checks the stored OAuth token for Schwab and refreshes it if expiring within 60 seconds.

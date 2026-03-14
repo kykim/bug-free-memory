@@ -25,7 +25,8 @@ func startDailyPipelineWorker(app: Application) async throws {
         accountNumber: Environment.get("SCHWAB_ACCOUNT_NUMBER") ?? "",
         clientID:      Environment.get("SCHWAB_CLIENT_ID") ?? "",
         clientSecret:  Environment.get("SCHWAB_CLIENT_SECRET") ?? "",
-        encryptionKey: encryptionKey
+        encryptionKey: encryptionKey,
+        logger: app.logger
     )
 
     let worker = try TemporalWorker(
@@ -39,6 +40,7 @@ func startDailyPipelineWorker(app: Application) async throws {
         activityContainers:
             PortfolioActivities(db: app.db, schwabClient: schwabClient, logger: app.logger),
             EODPriceActivities(db: app.db, tiingoClient: app.tiingo, logger: app.logger),
+            IndexEODPriceActivities(db: app.db, schwabClient: schwabClient, logger: app.logger),
             OptionEODPriceActivities(db: app.db, schwabClient: schwabClient, logger: app.logger),
             PricingActivities(db: app.db, logger: app.logger),
             RunLogActivities(db: app.db, logger: app.logger),

@@ -49,8 +49,8 @@
         <tbody>
         #if(indexes):
             #for(idx in indexes):
-            <tr id="row-#(idx.id)">
-                <td class="td-accent">#(idx.instrument.ticker)</td>
+            <tr id="row-#(idx.id)" class="clickable-row" onclick="window.location='/indexes/#(idx.id)'" style="cursor:pointer">
+                <td class="td-accent">#(idx.ticker)</td>
                 <td class="td-mono">#(idx.indexFamily)</td>
                 <td class="td-muted">#(idx.methodology)</td>
                 <td class="td-muted">#(idx.rebalanceFreq)</td>

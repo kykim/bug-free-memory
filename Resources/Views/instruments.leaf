@@ -75,7 +75,7 @@
                 <td class="td-accent">#(inst.ticker)</td>
                 <td class="td-mono"><span class="badge badge-active">#(inst.instrumentType)</span></td>
                 <td class="td-mono">#(inst.name)</td>
-                <td class="td-muted">#(inst.exchangeID)</td>
+                <td class="td-muted">#(inst.exchangeMic)</td>
                 <td class="td-muted">#(inst.currencyCode)</td>
                 <td class="td-muted">#if(inst.isActive):✓#endif</td>
                 <td class="td-actions"><div class="action-group">

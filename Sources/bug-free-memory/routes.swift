@@ -52,6 +52,8 @@ func routes(_ app: Application) throws {
             var schwabConnected: Bool
             var schwabHasRefreshToken: Bool
             var schwabTokenExpiresAt: String?
+            var schwabRefreshTokenExpiresAt: String?
+            var schwabAccessToken: String?
         }
         var schwabToken: OAuthToken? = nil
         if let userId = req.clerkAuth.userId {
@@ -60,12 +62,23 @@ func routes(_ app: Application) throws {
                 .filter(\OAuthToken.$provider, .equal, "schwab")
                 .first()
         }
+        // Schwab refresh tokens are valid for 7 days from last issue (updatedAt).
+        let refreshTokenExpiresAt: Date? = schwabToken.flatMap { $0.updatedAt }.map { $0.addingTimeInterval(7 * 24 * 3600) }
+        let refreshTokenValid = refreshTokenExpiresAt.map { $0 > Date() } ?? false
+        var schwabAccessToken: String? = nil
+        if let token = schwabToken, refreshTokenValid {
+            let key = try req.application.requireTokenEncryptionKey()
+            schwabAccessToken = try TokenEncryption.decrypt(token.accessToken, key: key)
+        }
+        let iso = ISO8601DateFormatter()
         return try await req.clerkView("dashboard", context: Context(
             appName: "bug-free-memory",
             pageTitle: "Dashboard",
             schwabConnected: schwabToken != nil,
             schwabHasRefreshToken: schwabToken?.refreshToken != nil,
-            schwabTokenExpiresAt: schwabToken.map { ISO8601DateFormatter().string(from: $0.expiresAt) }
+            schwabTokenExpiresAt: schwabToken.map { iso.string(from: $0.expiresAt) },
+            schwabRefreshTokenExpiresAt: refreshTokenExpiresAt.map { iso.string(from: $0) },
+            schwabAccessToken: schwabAccessToken
         ))
     }
     

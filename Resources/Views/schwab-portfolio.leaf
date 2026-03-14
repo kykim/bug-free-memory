@@ -1,0 +1,21 @@
+#extend("base"):
+#export("title"):Schwab Portfolio#endexport
+#export("nav_schwab_active"):active#endexport
+#export("nav_schwab_portfolio"):active#endexport
+
+#export("body"):
+<div class="page-header">
+    <div class="page-title">Schwab Portfolio<small>Live account positions from Schwab Trader API</small></div>
+</div>
+
+#if(error):
+<div class="flash error">#(error)</div>
+#endif
+
+#if(portfolioJSON):
+<div class="table-wrap">
+    <pre class="json-display">#(portfolioJSON)</pre>
+</div>
+#endif
+#endexport
+#endextend

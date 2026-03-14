@@ -106,7 +106,7 @@ extension OptionContract {
     ///   - currentPrice: Latest EODPrice for the underlying.
     ///   - priceHistory: Historical EODPrice records used to estimate volatility.
     ///   - riskFreeRate: Annualised risk-free rate (e.g. 0.05 = 5%).
-    ///   - lookback: Trading days used for vol estimation.
+    ///   - volatilityMethod: How to estimate volatility — `.historical(lookback:)` or `.ewma(lambda:)`.
     ///   - simulations: Number of simulated paths (default 100,000).
     ///   - stepsPerPath: Time steps per path (default 252 — one per trading day).
     ///   - bermudanExerciseDates: For Bermudan contracts, the specific dates on which
@@ -116,7 +116,7 @@ extension OptionContract {
         currentPrice: EODPrice,
         priceHistory: [EODPrice],
         riskFreeRate: Double = 0.05,
-        lookback: Int = 30,
+        volatilityMethod: VolatilityMethod = .historical(lookback: 30),
         simulations: Int = 100_000,
         stepsPerPath: Int = 252,
         bermudanExerciseDates: [Date] = [],
@@ -127,7 +127,7 @@ extension OptionContract {
         let K     = strikePrice
         let T     = timeToExpiry()
         guard T > 0,
-              let sigma = historicalVolatility(from: priceHistory, lookback: lookback)
+              let sigma = resolveVolatility(from: priceHistory, method: volatilityMethod)
         else { return nil }
 
         let (price, greeks, se) = _monteCarlo(
@@ -566,11 +566,14 @@ extension OptionContract {
                 throw AppError.noUnderlyingPriceData
             }
 
+            let volMethod: VolatilityMethod = body.ewmaLambda.map { .ewma(lambda: $0) }
+                ?? .historical(lookback: body.lookback)
+
             guard let result = contract.monteCarloPrice(
                 currentPrice: latest,
                 priceHistory: history,
                 riskFreeRate: body.riskFreeRate,
-                lookback: body.lookback,
+                volatilityMethod: volMethod,
                 simulations: body.simulations,
                 stepsPerPath: body.stepsPerPath,
                 bermudanExerciseDates: body.bermudanExerciseDates ?? []
@@ -589,7 +592,8 @@ extension OptionContract {
 
     struct MCPricingRequest: Content {
         var riskFreeRate: Double  = 0.05      // annualised, e.g. 0.05 = 5%
-        var lookback: Int         = 30        // trading days for vol estimation
+        var lookback: Int         = 30        // trading days for historical vol estimation
+        var ewmaLambda: Double?               // when set, use EWMA vol with this decay factor (e.g. 0.94)
         var simulations: Int      = 100_000   // number of paths
         var stepsPerPath: Int     = 252       // time steps per path
         var bermudanExerciseDates: [Date]?    // Bermudan contracts only

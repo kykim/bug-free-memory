@@ -16,14 +16,41 @@ struct InstrumentController: RouteCollection {
         async let exchanges   = Exchange.query(on: req.db).sort(\.$micCode).all()
         async let currencies  = Currency.query(on: req.db).sort(\.$name).all()
         let (flash, flashType) = req.popFlash()
+
+        let exchangeByID = Dictionary(uniqueKeysWithValues: try await exchanges.map { ($0.id!, $0) })
+
+        struct InstrumentRow: Encodable {
+            var id: String
+            var ticker: String
+            var instrumentType: String
+            var name: String
+            var exchangeID: String?
+            var exchangeMic: String?
+            var currencyCode: String
+            var isActive: Bool
+        }
+        let rows = try await instruments.map { inst in
+            let exch = inst.exchangeID.flatMap { exchangeByID[$0] }
+            return InstrumentRow(
+                id: inst.id!.uuidString,
+                ticker: inst.ticker,
+                instrumentType: inst.instrumentType.rawValue,
+                name: inst.name,
+                exchangeID: inst.exchangeID?.uuidString,
+                exchangeMic: exch?.micCode,
+                currencyCode: inst.currencyCode,
+                isActive: inst.isActive
+            )
+        }
+
         struct Context: Encodable {
-            var instruments: [Instrument]
+            var instruments: [InstrumentRow]
             var exchanges: [Exchange]
             var currencies: [Currency]
             var flash: String?
             var flashType: String?
         }
-        return try await req.clerkView("instruments", context: Context(instruments: instruments, exchanges: exchanges, currencies: currencies, flash: flash, flashType: flashType))
+        return try await req.clerkView("instruments", context: Context(instruments: rows, exchanges: exchanges, currencies: currencies, flash: flash, flashType: flashType))
     }
 
     func create(req: Request) async throws -> Response {

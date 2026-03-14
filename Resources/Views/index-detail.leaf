@@ -1,0 +1,79 @@
+#extend("base"):
+#export("title"):#(ticker) — Index Detail#endexport
+#export("nav_exchanges"): #endexport
+#export("nav_currencies"): #endexport
+#export("nav_instruments"): #endexport
+#export("nav_equities"): #endexport
+#export("nav_indexes"):active#endexport
+#export("nav_option_contracts"): #endexport
+#export("nav_eod_prices"): #endexport
+#export("nav_option_eod"): #endexport
+#export("nav_fred_yields"): #endexport
+#export("nav_market_holidays"): #endexport
+#export("nav_data_active"):active#endexport
+#export("nav_corp_actions"): #endexport
+
+#export("body"):
+#if(flash):
+<div class="flash #(flashType)">#(flash)</div>
+#endif
+<div class="page-header">
+    <div class="page-title">#(ticker)<small>#(name)</small></div>
+    <a href="/indexes" class="btn btn-ghost">← Indexes</a>
+</div>
+
+<div class="insert-panel">
+    <div class="panel-label">Index details</div>
+    <div class="form-row">
+        <div class="form-group fg-md"><label>Index Family</label><div class="td-muted">#(indexFamily)</div></div>
+        <div class="form-group fg-xl"><label>Methodology</label><div class="td-muted">#(methodology)</div></div>
+        <div class="form-group fg-md"><label>Rebalance Freq</label><div class="td-muted">#(rebalanceFreq)</div></div>
+    </div>
+</div>
+
+<div class="page-header" style="margin-top:2rem">
+    <div class="page-title" style="font-size:1rem">EOD Prices<small>page #(page)</small></div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+        <div class="row-count"><strong>#count(prices)</strong> records</div>
+        <form method="post" action="/indexes/#(id)/fetch-today" style="margin:0">
+            <button type="submit" class="btn btn-ghost">Fetch Today</button>
+        </form>
+        <form method="post" action="/indexes/#(id)/backfill" style="margin:0">
+            <button type="submit" class="btn btn-ghost">Backfill 1 Year</button>
+        </form>
+    </div>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th><th>Source</th></tr></thead>
+        <tbody>
+        #if(prices):
+            #for(p in prices):
+            <tr>
+                <td class="td-mono">#(p.priceDate)</td>
+                <td class="td-mono">#(p.open)</td>
+                <td class="td-mono">#(p.high)</td>
+                <td class="td-mono">#(p.low)</td>
+                <td class="td-mono">#(p.close)</td>
+                <td class="td-muted">#(p.volume)</td>
+                <td class="td-muted">#(p.source)</td>
+            </tr>
+            #endfor
+        #else:
+            <tr><td colspan="7"><div class="empty">No EOD price records found for this index.</div></td></tr>
+        #endif
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    #if(page > 1):
+    <a href="/indexes/#(id)?page=#(prevPage)" class="btn btn-ghost">← Newer</a>
+    #endif
+    #if(hasNextPage):
+    <a href="/indexes/#(id)?page=#(nextPage)" class="btn btn-ghost">Older →</a>
+    #endif
+</div>
+#endexport
+#endextend

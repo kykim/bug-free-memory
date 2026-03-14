@@ -10,6 +10,7 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import Logging
 import Vapor
 import Crypto
 
@@ -51,13 +52,16 @@ final class SchwabClient: @unchecked Sendable {
     /// URLSession used for all HTTP requests. Injectable for testing.
     let session: URLSession
 
+    let logger: Logger
+
     init(
         accountNumber: String,
         clientID: String,
         clientSecret: String,
         encryptionKey: SymmetricKey,
         accessToken: String = "",
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        logger: Logger = Logger(label: "SchwabClient")
     ) {
         self.accountNumber = accountNumber
         self.clientID = clientID
@@ -65,6 +69,7 @@ final class SchwabClient: @unchecked Sendable {
         self.encryptionKey = encryptionKey
         self.accessToken = accessToken
         self.session = session
+        self.logger = logger
     }
 
     // MARK: - Token Refresh
@@ -113,10 +118,17 @@ final class SchwabClient: @unchecked Sendable {
 
     /// Executes a request and returns decoded JSON. Throws SchwabError.authFailure on 401.
     func execute<T: Decodable>(_ request: URLRequest, as type: T.Type) async throws -> T {
+        let urlString = request.url?.absoluteString ?? "unknown"
+        logger.debug("[SchwabClient] \(request.httpMethod ?? "GET") \(urlString)")
+
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SchwabError.requestFailed(statusCode: 0)
         }
+
+        let rawBody = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+        logger.debug("[SchwabClient] \(urlString) → HTTP \(httpResponse.statusCode)")
+
         if httpResponse.statusCode == 401 { throw SchwabError.authFailure }
         guard (200..<300).contains(httpResponse.statusCode) else {
             throw SchwabError.requestFailed(statusCode: httpResponse.statusCode)
@@ -124,6 +136,7 @@ final class SchwabClient: @unchecked Sendable {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
+            logger.error("[SchwabClient] decode failed for \(urlString) — body: \(rawBody) — error: \(error)")
             throw SchwabError.decodingFailed(error)
         }
     }

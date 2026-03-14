@@ -102,20 +102,61 @@ private func seedEquity(ticker: String, db: any Database) async throws -> Instru
     return instrument
 }
 
-private func makePositions(_ items: [(ticker: String, type: SchwabAssetType, osi: String?)]) -> Data {
-    let json = items.map { item -> String in
-        var fields = #"{"symbol":"\#(item.ticker)","assetType":"\#(item.type.rawValue)","quantity":1.0"#
-        if let osi = item.osi { fields += #","description":"\#(osi)""# }
-        fields += "}"
-        return fields
-    }.joined(separator: ",")
-    return Data("[\(json)]".utf8)
+private func seedIndex(ticker: String, db: any Database) async throws -> Instrument {
+    if try await Currency.find("USD", on: db) == nil {
+        try await Currency(currencyCode: "USD", name: "US Dollar").save(on: db)
+    }
+
+    let exchange: Exchange
+    if let existing = try await Exchange.query(on: db).first() {
+        exchange = existing
+    } else {
+        exchange = Exchange(micCode: "XNAS", name: "NASDAQ", countryCode: "US", timezone: "America/New_York")
+        try await exchange.save(on: db)
+    }
+
+    let instrument = Instrument(
+        instrumentType: .index, ticker: ticker, name: ticker,
+        exchangeID: exchange.id!, currencyCode: "USD")
+    try await instrument.save(on: db)
+
+    let index = Index(instrumentID: instrument.id!)
+    try await index.save(on: db)
+
+    return instrument
 }
 
+private func makePositions(
+    _ items: [(ticker: String, type: SchwabAssetType, osi: String?, underlyingSymbol: String?)]
+) -> Data {
+    let positions = items.map { item -> String in
+        // For options: instrument.symbol IS the OSI symbol (osi param).
+        // When osi is nil for options, omit symbol so ticker defaults to "" → osiSymbol == nil.
+        // For equities/other: instrument.symbol is the ticker.
+        let symbol: String?
+        if item.type == .option {
+            symbol = item.osi
+        } else {
+            symbol = item.ticker
+        }
+        var inst = #"{"assetType":"\#(item.type.rawValue)""#
+        if let s = symbol { inst += #","symbol":"\#(s)""# }
+        if let us = item.underlyingSymbol { inst += #","underlyingSymbol":"\#(us)""# }
+        inst += "}"
+        return #"{"longQuantity":1.0,"shortQuantity":0.0,"marketValue":100.0,"instrument":\#(inst)}"#
+    }.joined(separator: ",")
+    return Data(#"{"securitiesAccount":{"positions":[\#(positions)]}}"#.utf8)
+}
+
+/// accountNumbers stub for the client whose accountNumber is "ACC123"
+private let accountNumbersData = Data(#"[{"accountNumber":"ACC123","hashValue":"TESTHASH"}]"#.utf8)
+
 private func mockPositions(_ data: Data) {
-    MockPortfolioURLProtocol.handler = { _ in
-        (data, HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
-                               statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    MockPortfolioURLProtocol.handler = { request in
+        let url = request.url?.absoluteString ?? ""
+        let responseData = url.contains("accountNumbers") ? accountNumbersData : data
+        return (responseData, HTTPURLResponse(url: URL(string: "https://api.schwabapi.com")!,
+                                              statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
 }
 
@@ -141,8 +182,8 @@ struct PortfolioActivityTests {
             let aapl = try await seedEquity(ticker: "AAPL", db: db)
             let spy  = try await seedEquity(ticker: "SPY",  db: db)
             let data = makePositions([
-                ("AAPL", .equity, nil),
-                ("SPY",  .equity, nil),
+                ("AAPL", .equity, nil, nil),
+                ("SPY",  .equity, nil, nil),
             ])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.equityInstrumentIDs.contains(aapl.id!))
@@ -154,7 +195,7 @@ struct PortfolioActivityTests {
     @Test("Equity with no matching instrument is dropped with not_in_equities")
     func equityNotInDB() async throws {
         try await withPortfolioDB { db, client in
-            let data = makePositions([("UNKNOWN", .equity, nil)])
+            let data = makePositions([("UNKNOWN", .equity, nil, nil)])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.equityInstrumentIDs.isEmpty)
             #expect(result.droppedPositions.count == 1)
@@ -166,7 +207,7 @@ struct PortfolioActivityTests {
     @Test("Unsupported asset type is dropped with unsupported_asset_type")
     func unsupportedAssetType() async throws {
         try await withPortfolioDB { db, client in
-            let data = makePositions([("BOND", .other, nil)])
+            let data = makePositions([("BOND", .other, nil, nil)])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.equityInstrumentIDs.isEmpty)
             #expect(result.optionInstrumentIDs.isEmpty)
@@ -177,7 +218,7 @@ struct PortfolioActivityTests {
     @Test("Option with missing OSI symbol is dropped with missing_osi_symbol")
     func optionMissingOSI() async throws {
         try await withPortfolioDB { db, client in
-            let data = makePositions([("AAPL", .option, nil)])
+            let data = makePositions([("AAPL", .option, nil, nil)])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.optionInstrumentIDs.isEmpty)
             #expect(result.droppedPositions[0].reason == "missing_osi_symbol")
@@ -187,7 +228,7 @@ struct PortfolioActivityTests {
     @Test("Option with invalid OSI symbol is dropped with osi_parse_error")
     func optionBadOSI() async throws {
         try await withPortfolioDB { db, client in
-            let data = makePositions([("AAPL", .option, "INVALID")])
+            let data = makePositions([("AAPL", .option, "INVALID", nil)])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.optionInstrumentIDs.isEmpty)
             #expect(result.droppedPositions[0].reason == "osi_parse_error")
@@ -198,10 +239,37 @@ struct PortfolioActivityTests {
     func optionUnderlyingNotFound() async throws {
         try await withPortfolioDB { db, client in
             // AAPL not seeded as equity
-            let data = makePositions([("AAPL", .option, "AAPL  260320C00175000")])
+            let data = makePositions([("AAPL", .option, "AAPL  260320C00175000", nil)])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.optionInstrumentIDs.isEmpty)
             #expect(result.droppedPositions[0].reason == "underlying_not_in_equities")
+        }
+    }
+
+    @Test("Option whose underlying is an index (OSI root matches stored ticker) is resolved")
+    func optionUnderlyingIsIndex() async throws {
+        try await withPortfolioDB { db, client in
+            _ = try await seedIndex(ticker: "SPXW", db: db)
+            let osiSymbol = "SPXW  260316C07060000"
+            let data = makePositions([(osiSymbol, .option, osiSymbol, nil)])
+            let result = try await runActivity(db: db, client: client, positions: data)
+            #expect(result.optionInstrumentIDs.count == 1)
+            #expect(result.newContractsRegistered == 1)
+            #expect(result.droppedPositions.isEmpty)
+        }
+    }
+
+    @Test("Option whose underlying index uses a different ticker than OSI root (e.g. $SPX vs SPXW)")
+    func optionUnderlyingSymbolFallback() async throws {
+        try await withPortfolioDB { db, client in
+            _ = try await seedIndex(ticker: "$SPX", db: db)
+            let osiSymbol = "SPXW  260323P06410000"
+            // OSI root = "SPXW" (not in DB); underlyingSymbol = "$SPX" (is in DB as index)
+            let data = makePositions([(osiSymbol, .option, osiSymbol, "$SPX")])
+            let result = try await runActivity(db: db, client: client, positions: data)
+            #expect(result.optionInstrumentIDs.count == 1)
+            #expect(result.newContractsRegistered == 1)
+            #expect(result.droppedPositions.isEmpty)
         }
     }
 
@@ -210,7 +278,7 @@ struct PortfolioActivityTests {
         try await withPortfolioDB { db, client in
             _ = try await seedEquity(ticker: "AAPL", db: db)
             let osiSymbol = "AAPL  260320C00175000"
-            let data = makePositions([("AAPL", .option, osiSymbol)])
+            let data = makePositions([("AAPL", .option, osiSymbol, nil)])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.optionInstrumentIDs.count == 1)
             #expect(result.newContractsRegistered == 1)
@@ -229,7 +297,7 @@ struct PortfolioActivityTests {
             let existingID = try await OptionContractRegistrar.register(
                 osi: osi, osiSymbol: osiSymbol, underlyingInstrument: underlying, db: db)
 
-            let data = makePositions([("AAPL", .option, osiSymbol)])
+            let data = makePositions([("AAPL", .option, osiSymbol, nil)])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.optionInstrumentIDs == [existingID])
             #expect(result.newContractsRegistered == 0)
@@ -242,11 +310,11 @@ struct PortfolioActivityTests {
             _ = try await seedEquity(ticker: "AAPL", db: db)
             _ = try await seedEquity(ticker: "SPY",  db: db)
             let data = makePositions([
-                ("AAPL",  .equity, nil),               // resolved
-                ("MSFT",  .equity, nil),               // dropped: not_in_equities
-                ("BOND",  .other,  nil),               // dropped: unsupported_asset_type
-                ("AAPL",  .option, "AAPL  260320C00175000"),  // new contract
-                ("SPY",   .option, nil),               // dropped: missing_osi_symbol
+                ("AAPL",  .equity, nil,                      nil),  // resolved
+                ("MSFT",  .equity, nil,                      nil),  // dropped: not_in_equities
+                ("BOND",  .other,  nil,                      nil),  // dropped: unsupported_asset_type
+                ("AAPL",  .option, "AAPL  260320C00175000",  nil),  // new contract
+                ("SPY",   .option, nil,                      nil),  // dropped: missing_osi_symbol
             ])
             let result = try await runActivity(db: db, client: client, positions: data)
             #expect(result.equityInstrumentIDs.count == 1)

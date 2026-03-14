@@ -33,6 +33,18 @@ struct OptionPriceResult: Content {
     let historicalVolatility: Double
 }
 
+// MARK: - Volatility Method
+
+/// Selects which historical volatility estimator to use when pricing an option.
+enum VolatilityMethod {
+    /// Equal-weighted log-return standard deviation over `lookback` trading days, annualised via √252.
+    case historical(lookback: Int)
+    /// RiskMetrics EWMA: σ²_t = λ·σ²_{t-1} + (1-λ)·r²_t, annualised via √252.
+    /// Typical decay factor for daily equity data: λ = 0.94.
+    /// More recent returns receive exponentially higher weight; effective half-life ≈ log(0.5)/log(λ) days.
+    case ewma(lambda: Double)
+}
+
 // MARK: - Math Helpers (private)
 
 private enum MathHelpers {
@@ -77,6 +89,46 @@ extension OptionContract {
         return sqrt(variance * 252)
     }
 
+    /// Annualised EWMA volatility using the RiskMetrics model.
+    ///
+    /// The variance is updated recursively: σ²_t = λ·σ²_{t-1} + (1-λ)·r²_t
+    /// Seeded with the first squared log-return; all available price history is used
+    /// (more data improves seed stability; the exponential decay naturally down-weights old returns).
+    ///
+    /// - Parameters:
+    ///   - prices: EODPrice history for the underlying — at least 2 records required.
+    ///   - lambda: Decay factor (default 0.94, the RiskMetrics daily-equity standard).
+    ///             Higher λ = slower decay = more weight on older returns.
+    /// - Returns: Annualised volatility estimate, or `nil` when fewer than 2 prices are supplied.
+    func ewmaVolatility(from prices: [EODPrice], lambda: Double = 0.94) -> Double? {
+        let closes = prices
+            .sorted { $0.priceDate < $1.priceDate }
+            .map { $0.adjClose ?? $0.close }
+
+        guard closes.count >= 2 else { return nil }
+
+        let logReturns = zip(closes, closes.dropFirst()).map { log($1 / $0) }
+
+        // Seed with the first squared return to avoid a zero-variance start
+        var variance = logReturns[0] * logReturns[0]
+        for i in 1..<logReturns.count {
+            let r = logReturns[i]
+            variance = lambda * variance + (1 - lambda) * r * r
+        }
+
+        return sqrt(variance * 252)
+    }
+
+    /// Resolves volatility using the chosen method.
+    private func resolveVolatility(from prices: [EODPrice], method: VolatilityMethod) -> Double? {
+        switch method {
+        case .historical(let lookback):
+            return historicalVolatility(from: prices, lookback: lookback)
+        case .ewma(let lambda):
+            return ewmaVolatility(from: prices, lambda: lambda)
+        }
+    }
+
     // MARK: Time to Expiry
 
     /// Years remaining until `expirationDate` from a given reference date.
@@ -91,20 +143,20 @@ extension OptionContract {
     ///   - currentPrice: Latest EODPrice for the underlying.
     ///   - priceHistory: Historical EODPrice records used to estimate volatility.
     ///   - riskFreeRate: Annualised risk-free rate (e.g. 0.05 = 5%).
-    ///   - lookback: Trading days used for historical vol estimation.
+    ///   - volatilityMethod: How to estimate volatility — `.historical(lookback:)` or `.ewma(lambda:)`.
     ///   - marketPrice: Optional observed market price — populates `impliedVolatility` when supplied.
     /// - Returns: `OptionPriceResult` or `nil` when inputs are invalid / insufficient history.
     func blackScholesPrice(
         currentPrice: EODPrice,
         priceHistory: [EODPrice],
         riskFreeRate: Double = 0.05,
-        lookback: Int = 30,
+        volatilityMethod: VolatilityMethod = .historical(lookback: 30),
         marketPrice: Double? = nil
     ) -> OptionPriceResult? {
 
         let S = currentPrice.adjClose ?? currentPrice.close
         let T = timeToExpiry()
-        guard T > 0, let sigma = historicalVolatility(from: priceHistory, lookback: lookback) else { return nil }
+        guard T > 0, let sigma = resolveVolatility(from: priceHistory, method: volatilityMethod) else { return nil }
 
         let (price, greeks) = _blackScholes(S: S, K: strikePrice, T: T, r: riskFreeRate, sigma: sigma)
         let iv = marketPrice.flatMap {
@@ -131,22 +183,25 @@ extension OptionContract {
     ///   - currentPrice: Latest EODPrice for the underlying.
     ///   - priceHistory: Historical EODPrice records used to estimate volatility.
     ///   - riskFreeRate: Annualised risk-free rate (e.g. 0.05 = 5%).
-    ///   - lookback: Trading days used for historical vol estimation.
+    ///   - volatilityMethod: How to estimate volatility — `.historical(lookback:)` or `.ewma(lambda:)`.
     ///   - steps: Number of binomial tree steps (higher = more accurate, slower).
     /// - Returns: `OptionPriceResult` or `nil` when inputs are invalid / insufficient history.
     func binomialPrice(
         currentPrice: EODPrice,
         priceHistory: [EODPrice],
         riskFreeRate: Double = 0.05,
-        lookback: Int = 30,
-        steps: Int = 200
+        volatilityMethod: VolatilityMethod = .historical(lookback: 30),
+        steps: Int = 200,
+        impliedVolatility: Double? = nil
     ) -> OptionPriceResult? {
 
         let S = currentPrice.adjClose ?? currentPrice.close
         let T = timeToExpiry()
-        guard T > 0, let sigma = historicalVolatility(from: priceHistory, lookback: lookback) else { return nil }
+        guard T > 0, let histVol = resolveVolatility(from: priceHistory, method: volatilityMethod) else { return nil }
 
-        let (price, greeks) = _binomialCRR(S: S, K: strikePrice, T: T, r: riskFreeRate, sigma: sigma, steps: steps)
+        let sigma = impliedVolatility ?? histVol   // ← prefer IV when available
+
+        let (price, greeks) = _binomialCRR(S: S, K: K, T: T, r: riskFreeRate, sigma: sigma, steps: steps)
 
         let styleLabel: String
         switch exerciseStyle {
@@ -159,7 +214,7 @@ extension OptionContract {
             price: price,
             contractValue: price * contractMultiplier,
             greeks: greeks,
-            impliedVolatility: nil,
+            impliedVolatility: impliedVolatility,
             model: "Binomial CRR (\(styleLabel), \(steps) steps)",
             underlyingPrice: S,
             timeToExpiry: T,
@@ -174,7 +229,7 @@ extension OptionContract {
         currentPrice: EODPrice,
         priceHistory: [EODPrice],
         riskFreeRate: Double = 0.05,
-        lookback: Int = 30,
+        volatilityMethod: VolatilityMethod = .historical(lookback: 30),
         steps: Int = 200,
         marketPrice: Double? = nil
     ) -> (blackScholes: OptionPriceResult, binomial: OptionPriceResult)? {
@@ -182,10 +237,12 @@ extension OptionContract {
         guard
             let bs  = blackScholesPrice(
                 currentPrice: currentPrice, priceHistory: priceHistory,
-                riskFreeRate: riskFreeRate, lookback: lookback, marketPrice: marketPrice),
+                riskFreeRate: riskFreeRate, volatilityMethod: volatilityMethod,
+                marketPrice: marketPrice),
             let bin = binomialPrice(
                 currentPrice: currentPrice, priceHistory: priceHistory,
-                riskFreeRate: riskFreeRate, lookback: lookback, steps: steps)
+                riskFreeRate: riskFreeRate, volatilityMethod: volatilityMethod,
+                steps: steps)
         else { return nil }
 
         return (bs, bin)
@@ -308,7 +365,7 @@ extension OptionContract {
         let greeks = Greeks(
             delta: (pUp - pDn) / (2 * dS),
             gamma: (pUp - 2 * price + pDn) / (dS * dS),
-            theta: (pT - price) / dT / 365,
+            theta: (pT - price) / dT,
             vega:  (pSigU - pSigD) / (2 * dSig) / 100,
             rho:   (pRU - pRD) / (2 * dR) / 100
         )
@@ -355,11 +412,14 @@ extension OptionContract {
             guard let latest = history.first else {
                 throw AppError.noUnderlyingPriceData
             }
+            let volMethod: VolatilityMethod = body.ewmaLambda.map { .ewma(lambda: $0) }
+                ?? .historical(lookback: body.lookback)
+
             guard let (bs, bin) = contract.price(
                 currentPrice: latest,
                 priceHistory: history,
                 riskFreeRate: body.riskFreeRate,
-                lookback: body.lookback,
+                volatilityMethod: volMethod,
                 steps: body.steps,
                 marketPrice: body.marketPrice
             ) else {
@@ -377,7 +437,8 @@ extension OptionContract {
 
     struct PricingRequest: Content {
         var riskFreeRate: Double = 0.05   // annualised, e.g. 0.05 = 5%
-        var lookback: Int        = 30     // trading days for vol estimation
+        var lookback: Int        = 30     // trading days for historical vol estimation
+        var ewmaLambda: Double?           // when set, use EWMA vol with this decay factor (e.g. 0.94)
         var steps: Int           = 200    // binomial tree steps
         var marketPrice: Double?          // supply to get implied volatility
     }

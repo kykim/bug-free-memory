@@ -27,7 +27,6 @@ struct PortfolioActivities {
     @Activity
     func fetchPortfolioPositions(runDate: Date) async throws -> FilteredPositionSet {
         let start = Date()
-        logger.info("[PortfolioActivity] starting for runDate=\(runDate)")
 
         // 1. Refresh token if needed
         try await schwabClient.refreshTokenIfNeeded(db: db)
@@ -81,11 +80,28 @@ struct PortfolioActivities {
                 continue
             }
 
-            // Look up underlying
-            guard let underlying = try await Instrument.query(on: db)
-                .filter(\.$ticker == osi.underlyingTicker)
-                .join(Equity.self, on: \Equity.$id == \Instrument.$id)
-                .first() else {
+            // Look up underlying — try OSI root ticker first, then Schwab's underlyingSymbol
+            // (e.g. SPXW options: OSI root = "SPXW", underlyingSymbol = "$SPX")
+            var candidates = [osi.underlyingTicker]
+            if let us = p.underlyingSymbol, us != osi.underlyingTicker {
+                candidates.append(us)
+            }
+            var underlying: Instrument? = nil
+            outer: for candidate in candidates {
+                if let found = try await Instrument.query(on: db)
+                    .filter(\.$ticker == candidate)
+                    .join(Equity.self, on: \Equity.$id == \Instrument.$id)
+                    .first() {
+                    underlying = found; break outer
+                }
+                if let found = try await Instrument.query(on: db)
+                    .filter(\.$ticker == candidate)
+                    .join(Index.self, on: \Index.$id == \Instrument.$id)
+                    .first() {
+                    underlying = found; break outer
+                }
+            }
+            guard let underlying else {
                 logger.warning("[PortfolioActivity] dropping \(osiSymbol): underlying_not_in_equities")
                 droppedPositions.append(DroppedPosition(ticker: osiSymbol, reason: "underlying_not_in_equities"))
                 continue

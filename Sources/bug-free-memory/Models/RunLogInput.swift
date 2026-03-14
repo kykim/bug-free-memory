@@ -31,6 +31,7 @@ struct RunLogInput: Codable, Sendable {
     let status: RunStatus
     let portfolioResult: FilteredPositionSet?
     let eodResult: EODPriceResult?
+    let indexEODResult: EODPriceResult?
     let optionEODResult: OptionEODResult?
     let pricingResult: PricingResult?
     let errorMessages: [String]

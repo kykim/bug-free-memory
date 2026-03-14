@@ -1,4 +1,5 @@
 import Fluent
+import FluentSQL
 import Foundation
 import Leaf
 import Vapor
@@ -11,6 +12,7 @@ struct OptionContractController: RouteCollection {
         g.get(":id", use: show)
         g.post(":id", "calculate-price", use: calculatePrice)
         g.post(":id", "compute-mc-greeks", use: computeMCGreeks)
+        g.post(":id", "fetch-schwab-price", use: fetchSchwabPrice)
         g.post(":id", "edit", use: update); g.post(":id", "delete", use: delete)
     }
 
@@ -26,14 +28,40 @@ struct OptionContractController: RouteCollection {
             .filter(.sql(unsafeRaw: "\"instrument_type\" IN ('equity_option'::instrument_type, 'index_option'::instrument_type)"))
             .sort(\.$ticker).all()
         let (flash, flashType) = req.popFlash()
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = TimeZone(identifier: "UTC")
+        struct ContractRow: Encodable {
+            var id: String
+            var underlying: UnderlyingRow
+            var optionType: String
+            var exerciseStyle: String
+            var strikePrice: Double
+            var expirationDate: String
+            var contractMultiplier: Double
+            var settlementType: String
+            var osiSymbol: String?
+            struct UnderlyingRow: Encodable { var ticker: String }
+        }
+        let rows = try await contracts.map { c in
+            ContractRow(
+                id: c.id!.uuidString,
+                underlying: .init(ticker: c.underlying.ticker),
+                optionType: c.optionType.rawValue,
+                exerciseStyle: c.exerciseStyle.rawValue,
+                strikePrice: c.strikePrice,
+                expirationDate: df.string(from: c.expirationDate),
+                contractMultiplier: c.contractMultiplier,
+                settlementType: c.settlementType,
+                osiSymbol: c.osiSymbol
+            )
+        }
         struct Context: Encodable {
-            var contracts: [OptionContract]
+            var contracts: [ContractRow]
             var underlyings: [Instrument]
             var optionInstruments: [Instrument]
             var flash: String?
             var flashType: String?
         }
-        return try await req.clerkView("option-contracts", context: Context(contracts: contracts, underlyings: underlyings, optionInstruments: optionInstruments, flash: flash, flashType: flashType))
+        return try await req.clerkView("option-contracts", context: Context(contracts: rows, underlyings: try await underlyings, optionInstruments: try await optionInstruments, flash: flash, flashType: flashType))
     }
 
     func show(req: Request) async throws -> View {
@@ -61,35 +89,59 @@ struct OptionContractController: RouteCollection {
 
         struct TheoreticalPriceRow: Encodable {
             var model: String
-            var underlyingPrice: Double
+            var underlyingPrice: String
             var price: String
             var historicalVolatility: String
-            var impliedVolatility: String?
-            var delta: String?
-            var gamma: String?
-            var theta: String?
-            var vega: String?
-            var rho: String?
+            var impliedVolatility: String
+            var delta: String
+            var gamma: String
+            var theta: String
+            var vega: String
+            var rho: String
         }
 
         struct DateRow: Encodable {
             var priceDate: String
-            var bid: Double?
-            var ask: Double?
-            var mid: Double?
-            var last: Double?
-            var settlementPrice: Double?
-            var volume: Int?
-            var openInterest: Int?
-            var impliedVolatility: Double?
-            var delta: Double?
-            var gamma: Double?
-            var theta: Double?
-            var vega: Double?
-            var underlyingPrice: Double?
-            var source: String?
+            var bid: String
+            var ask: String
+            var mid: String
+            var last: String
+            var settlementPrice: String
+            var volume: String
+            var openInterest: String
+            var impliedVolatility: String
+            var delta: String
+            var gamma: String
+            var theta: String
+            var vega: String
+            var underlyingPrice: String
+            var source: String
             var hasEOD: Bool
             var theoreticalPrices: [TheoreticalPriceRow]
+            init(priceDate: String, hasEOD: Bool, theoreticalPrices: [TheoreticalPriceRow],
+                 bid: Double? = nil, ask: Double? = nil, mid: Double? = nil, last: Double? = nil,
+                 settlementPrice: Double? = nil, volume: Int? = nil, openInterest: Int? = nil,
+                 impliedVolatility: Double? = nil, delta: Double? = nil, gamma: Double? = nil,
+                 theta: Double? = nil, vega: Double? = nil, underlyingPrice: Double? = nil,
+                 source: String? = nil) {
+                self.priceDate        = priceDate
+                self.hasEOD           = hasEOD
+                self.theoreticalPrices = theoreticalPrices
+                self.bid              = bid.map              { String(format: "%.2f", $0) } ?? ""
+                self.ask              = ask.map              { String(format: "%.2f", $0) } ?? ""
+                self.mid              = mid.map              { String(format: "%.2f", $0) } ?? ""
+                self.last             = last.map             { String(format: "%.2f", $0) } ?? ""
+                self.settlementPrice  = settlementPrice.map  { String(format: "%.2f", $0) } ?? ""
+                self.volume           = volume.map           { String($0) }                 ?? ""
+                self.openInterest     = openInterest.map     { String($0) }                 ?? ""
+                self.impliedVolatility = impliedVolatility.map { String(format: "%.4f", $0) } ?? ""
+                self.delta            = delta.map            { String(format: "%.5f", $0) } ?? ""
+                self.gamma            = gamma.map            { String(format: "%.5f", $0) } ?? ""
+                self.theta            = theta.map            { String(format: "%.5f", $0) } ?? ""
+                self.vega             = vega.map             { String(format: "%.5f", $0) } ?? ""
+                self.underlyingPrice  = underlyingPrice.map  { String(format: "%.2f", $0) } ?? ""
+                self.source           = source ?? ""
+            }
         }
 
         let theoreticalPrices = try await TheoreticalOptionEODPrice.query(on: req.db)
@@ -103,15 +155,15 @@ struct OptionContractController: RouteCollection {
             let dateStr = df.string(from: t.priceDate)
             let row = TheoreticalPriceRow(
                 model: t.modelDetail ?? t.model.rawValue,
-                underlyingPrice: t.underlyingPrice,
+                underlyingPrice: String(format: "%.2f", t.underlyingPrice),
                 price: String(format: "%.2f", t.price),
                 historicalVolatility: String(format: "%.5f", t.historicalVolatility),
-                impliedVolatility: t.impliedVolatility.map { String(format: "%.5f", $0) },
-                delta: t.delta.map { String(format: "%.5f", $0) },
-                gamma: t.gamma.map { String(format: "%.5f", $0) },
-                theta: t.theta.map { String(format: "%.5f", $0) },
-                vega: t.vega.map { String(format: "%.5f", $0) },
-                rho: t.rho.map { String(format: "%.5f", $0) }
+                impliedVolatility: t.impliedVolatility.map { String(format: "%.5f", $0) } ?? "",
+                delta: t.delta.map { String(format: "%.5f", $0) } ?? "",
+                gamma: t.gamma.map { String(format: "%.5f", $0) } ?? "",
+                theta: t.theta.map { String(format: "%.5f", $0) } ?? "",
+                vega: t.vega.map { String(format: "%.5f", $0) } ?? "",
+                rho: t.rho.map { String(format: "%.5f", $0) } ?? ""
             )
             theoreticalByDate[dateStr, default: []].append(row)
         }
@@ -121,15 +173,15 @@ struct OptionContractController: RouteCollection {
             let dateStr = df.string(from: p.priceDate)
             return DateRow(
                 priceDate: dateStr,
+                hasEOD: true,
+                theoreticalPrices: theoreticalByDate[dateStr] ?? [],
                 bid: p.bid, ask: p.ask, mid: p.mid, last: p.last,
                 settlementPrice: p.settlementPrice,
                 volume: p.volume, openInterest: p.openInterest,
                 impliedVolatility: p.impliedVolatility,
                 delta: p.delta, gamma: p.gamma, theta: p.theta, vega: p.vega,
                 underlyingPrice: p.underlyingPrice,
-                source: p.source,
-                hasEOD: true,
-                theoreticalPrices: theoreticalByDate[dateStr] ?? []
+                source: p.source
             )
         }
 
@@ -208,6 +260,69 @@ struct OptionContractController: RouteCollection {
         }
         try await req.optionPricingService.triggerGreeksComputation(for: id)
         return req.flash("Monte Carlo Greeks computation started.", type: "success", to: "/option-contracts/\(id)")
+    }
+
+    func fetchSchwabPrice(req: Request) async throws -> Response {
+        try req.requireDashboardAuth()
+        guard let id = req.parameters.get("id", as: UUID.self),
+              let contract = try await OptionContract.find(id, on: req.db) else {
+            return req.flash("Contract not found.", type: "error", to: "/option-contracts")
+        }
+        guard let osiSymbol = contract.osiSymbol, !osiSymbol.isEmpty else {
+            return req.flash("Contract has no OSI symbol — cannot fetch from Schwab.", type: "error", to: "/option-contracts/\(id)")
+        }
+        guard let schwab = req.application.schwab else {
+            return req.flash("Schwab client not configured.", type: "error", to: "/option-contracts/\(id)")
+        }
+        struct FetchForm: Content { var local_date: String? }
+        let form = try req.content.decode(FetchForm.self)
+        let priceDate: Date
+        if let dateStr = form.local_date,
+           let parsed = { let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"; df.timeZone = .current; return df }().date(from: dateStr) {
+            priceDate = parsed
+        } else {
+            priceDate = Calendar.current.startOfDay(for: Date())
+        }
+        do {
+            try await schwab.refreshTokenIfNeeded(db: req.db)
+            guard let quote = try await schwab.fetchOptionQuote(osiSymbol: osiSymbol) else {
+                return req.flash("No quote returned for \(osiSymbol).", type: "error", to: "/option-contracts/\(id)")
+            }
+            let sqlDB = req.db as! any SQLDatabase
+            try await sqlDB.raw("""
+                INSERT INTO option_eod_prices
+                    (id, instrument_id, price_date, bid, ask, last, settlement_price,
+                     volume, open_interest, implied_volatility,
+                     delta, gamma, theta, vega, rho, underlying_price, source)
+                VALUES
+                    (\(bind: UUID()), \(bind: id), \(bind: priceDate),
+                     \(bind: quote.bidPrice), \(bind: quote.askPrice), \(bind: quote.lastPrice),
+                     \(bind: quote.closePrice),
+                     \(bind: quote.totalVolume), \(bind: quote.openInterest),
+                     \(bind: quote.volatility.map { $0 / 100.0 }),
+                     \(bind: quote.delta), \(bind: quote.gamma), \(bind: quote.theta),
+                     \(bind: quote.vega), \(bind: quote.rho), \(bind: quote.underlyingPrice),
+                     'schwab')
+                ON CONFLICT (instrument_id, price_date) DO UPDATE SET
+                    bid                = EXCLUDED.bid,
+                    ask                = EXCLUDED.ask,
+                    last               = EXCLUDED.last,
+                    settlement_price   = EXCLUDED.settlement_price,
+                    volume             = EXCLUDED.volume,
+                    open_interest      = EXCLUDED.open_interest,
+                    implied_volatility = EXCLUDED.implied_volatility,
+                    delta              = EXCLUDED.delta,
+                    gamma              = EXCLUDED.gamma,
+                    theta              = EXCLUDED.theta,
+                    vega               = EXCLUDED.vega,
+                    rho                = EXCLUDED.rho,
+                    underlying_price   = EXCLUDED.underlying_price,
+                    source             = 'schwab'
+                """).run()
+        } catch {
+            return req.flash("Fetch failed: \(error)", type: "error", to: "/option-contracts/\(id)")
+        }
+        return req.flash("Schwab price fetched for \(osiSymbol).", type: "success", to: "/option-contracts/\(id)")
     }
 
     func create(req: Request) async throws -> Response {

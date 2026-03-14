@@ -15,9 +15,6 @@ final class Index: Model, Content, @unchecked Sendable {
     @ID(custom: "instrument_id", generatedBy: .user)
     var id: UUID?
 
-    @Parent(key: "instrument_id")
-    var instrument: Instrument
-
     @OptionalField(key: "index_family")
     var indexFamily: String?
 
@@ -36,7 +33,6 @@ final class Index: Model, Content, @unchecked Sendable {
         rebalanceFreq: String? = nil
     ) {
         self.id = instrumentID
-        self.$instrument.id = instrumentID
         self.indexFamily = indexFamily
         self.methodology = methodology
         self.rebalanceFreq = rebalanceFreq

@@ -60,7 +60,7 @@ struct OptionEODPriceActivities {
 
             let quote: SchwabOptionQuote?
             do {
-                quote = try await schwabClient.fetchOptionEODPrice(osiSymbol: osiSymbol)
+                quote = try await schwabClient.fetchOptionQuote(osiSymbol: osiSymbol)
             } catch SchwabError.authFailure {
                 throw SchwabError.authFailure
             } catch {
@@ -98,9 +98,9 @@ struct OptionEODPriceActivities {
                      underlying_price, risk_free_rate, source)
                 VALUES
                     (\(bind: newID), \(bind: instrumentID), \(bind: startOfDay),
-                     \(bind: q.bid), \(bind: q.ask), \(bind: q.last),
-                     \(bind: Optional<Double>.none), \(bind: q.volume), \(bind: q.openInterest),
-                     \(bind: q.impliedVolatility), \(bind: q.delta), \(bind: q.gamma),
+                     \(bind: q.bidPrice), \(bind: q.askPrice), \(bind: q.lastPrice),
+                     \(bind: q.closePrice), \(bind: q.totalVolume), \(bind: q.openInterest),
+                     \(bind: q.volatility.map { $0 / 100.0 }), \(bind: q.delta), \(bind: q.gamma),
                      \(bind: q.theta), \(bind: q.vega), \(bind: q.rho),
                      \(bind: q.underlyingPrice), \(bind: riskFreeRate), 'schwab')
                 ON CONFLICT (instrument_id, price_date) DO UPDATE SET

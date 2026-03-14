@@ -26,7 +26,15 @@ public func configure(_ app: Application) async throws {
         guard let keyData = Data(base64Encoded: keyBase64), keyData.count == 32 else {
             throw AppError.invalidEncryptionKeyConfig
         }
-        app.tokenEncryptionKey = SymmetricKey(data: keyData)
+        let encryptionKey = SymmetricKey(data: keyData)
+        app.tokenEncryptionKey = encryptionKey
+        app.schwab = SchwabClient(
+            accountNumber: Environment.get("SCHWAB_ACCOUNT_NUMBER") ?? "",
+            clientID:      Environment.get("SCHWAB_CLIENT_ID") ?? "",
+            clientSecret:  Environment.get("SCHWAB_CLIENT_SECRET") ?? "",
+            encryptionKey: encryptionKey,
+            logger: app.logger
+        )
     }
     // Workers don't set TOKEN_ENCRYPTION_KEY and never call OAuth routes, so absence is fine.
 
@@ -102,6 +110,7 @@ public func configure(_ app: Application) async throws {
     try app.register(collection: FREDYieldController())
     try app.register(collection: MarketHolidayController())
     try app.register(collection: TemporalController())
+    try app.register(collection: SchwabController())
     try routes(app)
 }
 

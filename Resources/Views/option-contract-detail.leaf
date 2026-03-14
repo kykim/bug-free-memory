@@ -33,14 +33,21 @@
         <div class="form-group fg-sm"><label>Multiplier</label><div class="td-muted">#(contractMultiplier)</div></div>
         <div class="form-group fg-sm"><label>Settlement</label><div class="td-muted">#(settlementType)</div></div>
         <div class="form-group fg-lg"><label>OSI Symbol</label><div class="td-mono">#(osiSymbol)</div></div>
+        <div class="form-group fg-xl"><label>UUID</label><div class="td-muted">#(id)</div></div>
     </div>
 </div>
 
 <div class="page-header" style="margin-top:2rem">
     <div class="page-title" style="font-size:1rem">Prices<small>page #(page)</small></div>
-    <form method="post" action="/option-contracts/#(id)/calculate-price">
-        <button type="submit" class="btn btn-ghost">Calculate Price</button>
-    </form>
+    <div style="display:flex;gap:.5rem">
+        <form method="post" action="/option-contracts/#(id)/fetch-schwab-price" style="margin:0" onsubmit="injectLocalDate(this)">
+            <input type="hidden" name="local_date" value="">
+            <button type="submit" class="btn btn-ghost">Fetch Schwab Price</button>
+        </form>
+        <form method="post" action="/option-contracts/#(id)/calculate-price" style="margin:0">
+            <button type="submit" class="btn btn-ghost">Calculate Price</button>
+        </form>
+    </div>
 </div>
 
 <div class="table-wrap">
@@ -110,6 +117,11 @@
 </div>
 
 <script>
+function injectLocalDate(form) {
+    var d = new Date();
+    var local = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    form.querySelector('input[name="local_date"]').value = local;
+}
 function toggleTheoretical(priceRow) {
     var date = priceRow.dataset.date;
     var next = priceRow.nextElementSibling;

@@ -36,16 +36,21 @@ struct PricingActivities {
     func priceAllContracts(runDate: Date) async throws -> PricingResult {
         // 1. Load yield curve — abort early if empty
         let yieldCurve = try await YieldCurve.load(db: db, runDate: runDate)
+        logger.info("[PricingActivity] yieldCurve points=\(yieldCurve.points.count)")
         guard !yieldCurve.points.isEmpty else {
+            logger.error("[PricingActivity] noFREDRatesAvailable runDate=\(runDate)")
             throw PricingError.noFREDRatesAvailable(runDate: runDate)
         }
 
         // 2. Query non-expired contracts with their underlying
-        let startOfDay = Calendar.utcCal.startOfDay(for: runDate)
+        let startOfDay = Calendar.current.startOfDay(for: runDate)
+        let endOfDay   = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)!
+        logger.info("[PricingActivity] starting runDate=\(runDate) startOfDay=\(startOfDay) endOfDay=\(endOfDay)")
         let contracts = try await OptionContract.query(on: db)
             .filter(\.$expirationDate >= startOfDay)
             .with(\.$underlying)
             .all()
+        logger.info("[PricingActivity] contracts to price: \(contracts.count)")
 
         var contractsPriced = 0
         var totalRows = 0
@@ -62,7 +67,8 @@ struct PricingActivities {
                         contract: contract,
                         yieldCurve: yieldCurve,
                         runDate: runDate,
-                        startOfDay: startOfDay
+                        startOfDay: startOfDay,
+                        endOfDay: endOfDay
                     )
                     return (id, outcome)
                 }
@@ -99,7 +105,8 @@ struct PricingActivities {
         contract: OptionContract,
         yieldCurve: YieldCurve,
         runDate: Date,
-        startOfDay: Date
+        startOfDay: Date,
+        endOfDay: Date
     ) async -> Result<Int, FailedContract> {
         guard let instrumentID = contract.id else {
             return .failure(FailedContract(instrumentID: UUID(), reason: "missing_instrument_id"))
@@ -108,20 +115,28 @@ struct PricingActivities {
         // a. Fetch today's OptionEODPrice
         let optionEODOptional = try? await OptionEODPrice.query(on: db)
             .filter(\.$instrument.$id == instrumentID)
-            .filter(\.$priceDate == startOfDay)
+            .filter(\.$priceDate >= startOfDay)
+            .filter(\.$priceDate < endOfDay)
             .first()
         guard let optionEOD = optionEODOptional ?? nil else {
+            // Log the most recent EOD price date to diagnose the mismatch
+            let mostRecent = try? await OptionEODPrice.query(on: db)
+                .filter(\.$instrument.$id == instrumentID)
+                .sort(\.$priceDate, .descending)
+                .first()
+            logger.warning("[PricingActivity] no_eod_price_today instrumentID=\(instrumentID) startOfDay=\(startOfDay) endOfDay=\(endOfDay) mostRecentPriceDate=\(mostRecent?.priceDate.description ?? "none")")
             return .failure(FailedContract(instrumentID: instrumentID, reason: "no_eod_price_today"))
         }
 
-        // b. Fetch last 31 days of underlying EOD history
+        // b. Fetch last 31 days of underlying EOD history (most recent first)
         let history = (try? await EODPrice.query(on: db)
             .filter(\.$instrument.$id == contract.$underlying.id)
-            .sort(\.$priceDate, .ascending)
+            .sort(\.$priceDate, .descending)
             .limit(31)
             .all()) ?? []
 
         guard history.count >= 2 else {
+            logger.warning("[PricingActivity] insufficient_history instrumentID=\(instrumentID) osiSymbol=\(contract.osiSymbol ?? "nil") historyCount=\(history.count)")
             return .failure(FailedContract(instrumentID: instrumentID, reason: "insufficient_history"))
         }
 
@@ -129,7 +144,8 @@ struct PricingActivities {
         let tte = contract.timeToExpiry(from: runDate)
         let r = yieldCurve.interpolate(timeToExpiry: tte)
 
-        let latest = history.last!
+        let latest = history.first!
+        logger.debug("[PricingActivity] pricing instrumentID=\(instrumentID) osiSymbol=\(contract.osiSymbol ?? "nil") underlyingID=\(contract.$underlying.id) T=\(tte) r=\(r) historyCount=\(history.count) latestDate=\(latest.priceDate) latestClose=\(latest.close)")
         let sqlDB = db as! any SQLDatabase
         var rowsUpserted = 0
 
@@ -143,7 +159,11 @@ struct PricingActivities {
                 pricingModel: .blackScholes, source: "calculated"
             )
             record.impliedVolatility = optionEOD.impliedVolatility
-            if (try? await upsert(record: record, on: sqlDB)) != nil { rowsUpserted += 1 }
+            do { try await upsert(record: record, on: sqlDB); rowsUpserted += 1 } catch {
+                logger.error("[PricingActivity] upsert blackScholes failed instrumentID=\(instrumentID) error=\(String(reflecting: error))")
+            }
+        } else {
+            logger.warning("[PricingActivity] blackScholes returned nil instrumentID=\(instrumentID) osiSymbol=\(contract.osiSymbol ?? "nil") T=\(tte)")
         }
 
         if let binResult = contract.binomialPrice(
@@ -155,25 +175,35 @@ struct PricingActivities {
                 pricingModel: .binomial, source: "calculated"
             )
             record.impliedVolatility = optionEOD.impliedVolatility
-            if (try? await upsert(record: record, on: sqlDB)) != nil { rowsUpserted += 1 }
+            do { try await upsert(record: record, on: sqlDB); rowsUpserted += 1 } catch {
+                logger.error("[PricingActivity] upsert binomial failed instrumentID=\(instrumentID) error=\(String(reflecting: error))")
+            }
+        } else {
+            logger.warning("[PricingActivity] binomial returned nil instrumentID=\(instrumentID) osiSymbol=\(contract.osiSymbol ?? "nil") T=\(tte)")
         }
 
         if let mcResult = contract.monteCarloPrice(
             currentPrice: latest, priceHistory: history, riskFreeRate: r,
-            lookback: 30, simulations: 100_000, stepsPerPath: 252, computeGreeks: false
+            volatilityMethod: .historical(lookback: 30), simulations: 100_000, stepsPerPath: 252, computeGreeks: false
         ) {
             let record = TheoreticalOptionEODPrice.from(
                 result: mcResult, instrumentID: instrumentID,
                 priceDate: startOfDay, riskFreeRate: r, source: "calculated"
             )
             record.impliedVolatility = optionEOD.impliedVolatility
-            if (try? await upsert(record: record, on: sqlDB)) != nil { rowsUpserted += 1 }
+            do { try await upsert(record: record, on: sqlDB); rowsUpserted += 1 } catch {
+                logger.error("[PricingActivity] upsert monteCarlo failed instrumentID=\(instrumentID) error=\(String(reflecting: error))")
+            }
+        } else {
+            logger.warning("[PricingActivity] monteCarlo returned nil instrumentID=\(instrumentID) osiSymbol=\(contract.osiSymbol ?? "nil") T=\(tte)")
         }
 
         if rowsUpserted == 0 {
+            logger.warning("[PricingActivity] all_pricers_returned_nil instrumentID=\(instrumentID) osiSymbol=\(contract.osiSymbol ?? "nil")")
             return .failure(FailedContract(instrumentID: instrumentID, reason: "all_pricers_returned_nil"))
         }
 
+        logger.info("[PricingActivity] priced osiSymbol=\(contract.osiSymbol ?? "nil") rows=\(rowsUpserted)")
         return .success(rowsUpserted)
     }
 
@@ -197,7 +227,7 @@ struct PricingActivities {
                  \(bind: record.riskFreeRate), \(bind: record.underlyingPrice),
                  \(bind: record.delta), \(bind: record.gamma), \(bind: record.theta),
                  \(bind: record.vega), \(bind: record.rho),
-                 \(bind: modelStr), \(bind: record.modelDetail), \(bind: record.source))
+                 \(bind: modelStr)::pricing_model, \(bind: record.modelDetail), \(bind: record.source))
             ON CONFLICT (instrument_id, price_date, model) DO UPDATE SET
                 price                = EXCLUDED.price,
                 settlement_price     = EXCLUDED.settlement_price,
@@ -216,10 +246,3 @@ struct PricingActivities {
     }
 }
 
-private extension Calendar {
-    static let utcCal: Calendar = {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "UTC")!
-        return cal
-    }()
-}

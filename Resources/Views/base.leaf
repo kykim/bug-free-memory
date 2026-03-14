@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/styles.css?v=3">
+    <link rel="stylesheet" href="/styles.css?v=4">
 </head>
 <body>
 <script>
@@ -44,6 +44,15 @@ document.addEventListener('DOMContentLoaded', function () {
                         <form method="POST" action="/temporal/register-schedule">
                             <button type="submit" class="nav-dropdown-item-btn">Register Schedule</button>
                         </form>
+                        <form method="POST" action="/temporal/trigger-schedule">
+                            <button type="submit" class="nav-dropdown-item-btn">Trigger Now</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="nav-dropdown">
+                    <button class="nav-dropdown-btn #import("nav_schwab_active")">Schwab ▾</button>
+                    <div class="nav-dropdown-menu">
+                        <a href="/schwab/portfolio" class="#import("nav_schwab_portfolio")">Portfolio</a>
                     </div>
                 </div>
             </nav>

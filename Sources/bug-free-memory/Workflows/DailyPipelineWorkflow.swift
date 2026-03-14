@@ -45,6 +45,7 @@ public final class DailyPipelineWorkflow {
                 status: .skipped,
                 portfolioResult: nil,
                 eodResult: nil,
+                indexEODResult: nil,
                 optionEODResult: nil,
                 pricingResult: nil,
                 errorMessages: [input.isHoliday ? "Market holiday — pipeline skipped" : "Weekend — pipeline skipped"],
@@ -104,7 +105,7 @@ public final class DailyPipelineWorkflow {
             errorMessages.append("PortfolioActivity failed: \(error)")
         }
 
-        // 3. EOD price activity
+        // 3. EOD price activity (equities — Tiingo)
         var eodResult: EODPriceResult?
         do {
             eodResult = try await Workflow.executeActivity(
@@ -116,7 +117,19 @@ public final class DailyPipelineWorkflow {
             errorMessages.append("EODPriceActivity failed: \(error)")
         }
 
-        // 4. Option EOD price activity
+        // 4. Index EOD price activity (Schwab)
+        var indexEODResult: EODPriceResult?
+        do {
+            indexEODResult = try await Workflow.executeActivity(
+                IndexEODPriceActivities.Activities.FetchAndUpsertEODIndexPrices.self,
+                options: eodOptions,
+                input: runDate
+            )
+        } catch {
+            errorMessages.append("IndexEODPriceActivity failed: \(error)")
+        }
+
+        // 5. Option EOD price activity
         var optionEODResult: OptionEODResult?
         do {
             optionEODResult = try await Workflow.executeActivity(
@@ -128,7 +141,7 @@ public final class DailyPipelineWorkflow {
             errorMessages.append("OptionEODPriceActivity failed: \(error)")
         }
 
-        // 5. Pricing activity — only if option EOD data was fetched
+        // 6. Pricing activity — only if option EOD data was fetched
         var pricingResult: PricingResult?
         if (optionEODResult?.rowsUpserted ?? 0) > 0 {
             do {
@@ -144,7 +157,7 @@ public final class DailyPipelineWorkflow {
             errorMessages.append("PricingActivity skipped: no option EOD data")
         }
 
-        // 6. Determine status
+        // 7. Determine status
         let status = RunStatus.determine(
             portfolioResult: portfolioResult,
             eodResult: eodResult,
@@ -153,12 +166,13 @@ public final class DailyPipelineWorkflow {
             errorMessages: errorMessages
         )
 
-        // 7. RunLogActivity — always executes
+        // 8. RunLogActivity — always executes
         let logInput = RunLogInput(
             runDate: runDate,
             status: status,
             portfolioResult: portfolioResult,
             eodResult: eodResult,
+            indexEODResult: indexEODResult,
             optionEODResult: optionEODResult,
             pricingResult: pricingResult,
             errorMessages: errorMessages,

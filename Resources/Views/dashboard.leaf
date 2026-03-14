@@ -76,8 +76,24 @@
                     #if(schwabTokenExpiresAt):
                     <div class="form-row">
                         <div class="form-group fg-sm">
-                            <label>Token Expires At</label>
+                            <label>Access Token Expires</label>
                             <code class="td-mono" id="schwab-expires-at" data-utc="#(schwabTokenExpiresAt)"></code>
+                        </div>
+                    </div>
+                    #endif
+                    #if(schwabRefreshTokenExpiresAt):
+                    <div class="form-row">
+                        <div class="form-group fg-sm">
+                            <label>Refresh Token Expires</label>
+                            <code class="td-mono" id="schwab-refresh-expires-at" data-utc="#(schwabRefreshTokenExpiresAt)"></code>
+                        </div>
+                    </div>
+                    #endif
+                    #if(schwabAccessToken):
+                    <div class="form-row" style="margin-top:0.5rem">
+                        <div class="form-group" style="width:100%">
+                            <label>Access Token</label>
+                            <pre style="font-size:0.7rem;white-space:pre-wrap;word-break:break-all;margin:0;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:8px 12px;color:var(--text)">#(schwabAccessToken)</pre>
                         </div>
                     </div>
                     #endif
@@ -174,6 +190,12 @@
         var expiresEl = document.getElementById('schwab-expires-at');
         if (expiresEl && expiresEl.dataset.utc) {
             expiresEl.textContent = new Date(expiresEl.dataset.utc).toLocaleString(undefined, {
+                dateStyle: 'medium', timeStyle: 'short'
+            });
+        }
+        var refreshExpiresEl = document.getElementById('schwab-refresh-expires-at');
+        if (refreshExpiresEl && refreshExpiresEl.dataset.utc) {
+            refreshExpiresEl.textContent = new Date(refreshExpiresEl.dataset.utc).toLocaleString(undefined, {
                 dateStyle: 'medium', timeStyle: 'short'
             });
         }

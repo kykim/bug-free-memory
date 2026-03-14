@@ -136,14 +136,17 @@ struct SchwabAssetTypeTests {
 @Suite("SchwabPosition decoding")
 struct SchwabPositionTests {
 
-    @Test("Decodes all fields via CodingKeys mapping")
-    func fullDecode() throws {
+    @Test("Decodes all fields from nested instrument structure (equity)")
+    func fullDecodeEquity() throws {
         let json = """
         {
-            "symbol": "AAPL",
-            "assetType": "EQUITY",
-            "quantity": 10.0,
-            "description": "AAPL  260320C00175000",
+            "longQuantity": 10.0,
+            "shortQuantity": 0.0,
+            "instrument": {
+                "symbol": "AAPL",
+                "assetType": "EQUITY",
+                "cusip": "037833100"
+            },
             "marketValue": 17500.0
         }
         """.data(using: .utf8)!
@@ -151,14 +154,45 @@ struct SchwabPositionTests {
         #expect(position.ticker == "AAPL")
         #expect(position.assetType == .equity)
         #expect(position.quantity == 10.0)
-        #expect(position.osiSymbol == "AAPL  260320C00175000")
+        #expect(position.osiSymbol == nil)
         #expect(position.marketValue == 17500.0)
+        #expect(position.cusip == "037833100")
+        #expect(position.underlyingSymbol == nil)
+    }
+
+    @Test("Decodes all fields from nested instrument structure (option)")
+    func fullDecodeOption() throws {
+        let json = """
+        {
+            "longQuantity": 1.0,
+            "shortQuantity": 0.0,
+            "instrument": {
+                "symbol": "SPXW  260318C07080000",
+                "assetType": "OPTION",
+                "cusip": "0SPXW.CI67080000",
+                "underlyingSymbol": "$SPX"
+            },
+            "marketValue": 500.0
+        }
+        """.data(using: .utf8)!
+        let position = try JSONDecoder().decode(SchwabPosition.self, from: json)
+        #expect(position.ticker == "SPXW  260318C07080000")
+        #expect(position.assetType == .option)
+        #expect(position.osiSymbol == "SPXW  260318C07080000")
+        #expect(position.quantity == 1.0)
+        #expect(position.marketValue == 500.0)
+        #expect(position.cusip == "0SPXW.CI67080000")
+        #expect(position.underlyingSymbol == "$SPX")
     }
 
     @Test("Optional fields decode as nil when absent")
     func optionalFieldsAbsent() throws {
         let json = """
-        { "symbol": "SPY", "assetType": "EQUITY", "quantity": 5.0 }
+        {
+            "longQuantity": 5.0,
+            "shortQuantity": 0.0,
+            "instrument": { "symbol": "SPY", "assetType": "EQUITY" }
+        }
         """.data(using: .utf8)!
         let position = try JSONDecoder().decode(SchwabPosition.self, from: json)
         #expect(position.ticker == "SPY")
@@ -166,19 +200,51 @@ struct SchwabPositionTests {
         #expect(position.marketValue == nil)
     }
 
-    @Test("Option position decodes assetType as .option")
+    @Test("Short position yields negative quantity")
+    func shortPosition() throws {
+        let json = """
+        {
+            "longQuantity": 0.0,
+            "shortQuantity": 10.0,
+            "instrument": { "symbol": "AAPL", "assetType": "EQUITY" }
+        }
+        """.data(using: .utf8)!
+        let position = try JSONDecoder().decode(SchwabPosition.self, from: json)
+        #expect(position.quantity == -10.0)
+    }
+
+    @Test("Option position: ticker and osiSymbol both equal instrument.symbol")
     func optionPosition() throws {
         let json = """
         {
-            "symbol": "AAPL  260320C00175000",
-            "assetType": "OPTION",
-            "quantity": 1.0,
-            "description": "AAPL  260320C00175000"
+            "longQuantity": 1.0,
+            "shortQuantity": 0.0,
+            "instrument": {
+                "symbol": "AAPL  260320C00175000",
+                "assetType": "OPTION",
+                "underlyingSymbol": "AAPL"
+            }
         }
         """.data(using: .utf8)!
         let position = try JSONDecoder().decode(SchwabPosition.self, from: json)
         #expect(position.assetType == .option)
+        #expect(position.ticker == "AAPL  260320C00175000")
         #expect(position.osiSymbol == "AAPL  260320C00175000")
+        #expect(position.underlyingSymbol == "AAPL")
+    }
+
+    @Test("Missing symbol defaults to empty string")
+    func missingSymbol() throws {
+        let json = """
+        {
+            "longQuantity": 1000.0,
+            "shortQuantity": 0.0,
+            "instrument": { "assetType": "EQUITY" }
+        }
+        """.data(using: .utf8)!
+        let position = try JSONDecoder().decode(SchwabPosition.self, from: json)
+        #expect(position.ticker == "")
+        #expect(position.assetType == .equity)
     }
 }
 

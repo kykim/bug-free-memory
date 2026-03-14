@@ -36,9 +36,6 @@ final class Instrument: Model, Content, @unchecked Sendable {
     var createdAt: Date?
 
     // Relations
-    @OptionalChild(for: \.$instrument)
-    var index: Index?
-
     @Children(for: \.$instrument)
     var eodPrices: [EODPrice]
 
